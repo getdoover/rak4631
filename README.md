@@ -2,8 +2,14 @@
     <img src="http://doover.dev/wp-content/uploads/2022/05/Powered-by-Doover-Clear.png">
 </p>
 
-### Lora Device - Powered by Doover
+### RAK Wireless Lorawan - Powered by Doover
 
-You can use this repository directly in Doover to launch lora devices, or fork this and use it as a base for your own custom applications.
+Create, use and customise your own Doover powered nodes using RAK Wireless WisBlock hardware. In this case - The RAK4631 Lorawan module.
+
+Check the branches for individual applications including:
+- 4-20ma Level Sensor
+- Rain Gauge
+
 
 For more information about Doover - go to Doover.com
+For more information about RAK4631 - go to https://store.rakwireless.com/products/rak4631-lpwan-node?variant=37505443987654

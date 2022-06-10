@@ -13,7 +13,12 @@ You can open this project with one of 2 choices for programming your device.
     In the Arduino IDE, open the 'doover_device.ino' file located inside the 'doover_device' folder to get started.
 
     https://www.arduino.cc/en/software
-    
+
+
+    ###### INSTRUCTIONS FOR SETTING UP ARDUINO TO PROGRAM DEVICES ######
+
+    https://github.com/RAKWireless/RAKwireless-Arduino-BSP-Index
+
 
 2) Platform IO
 
