@@ -225,20 +225,6 @@ class target:
                                 "min": -999,
                                 "max": 999
                             },
-                            "rawlevel": {
-                                "type": "uiVariable",
-                                "name": "rawlevel",
-                                "displayString": "Raw Reading (ma)",
-                                "varType": "float",
-                                "decPrecision": 2
-                            },
-                            "rawlevel_processed": {
-                                "type": "uiVariable",
-                                "name": "rawlevel_processed",
-                                "displayString": "Raw Reading (cm)",
-                                "varType": "float",
-                                "decPrecision": 1
-                            },
                             "battAlarmLevel": {
                                 "type": "uiFloatParam",
                                 "name": "battAlarmLevel",
@@ -259,6 +245,27 @@ class target:
                                 "displayString": "Burst Mode",
                                 "colour": "blue",
                                 "requiresConfirm": True
+                            },
+                            "rawlevel": {
+                                "type": "uiVariable",
+                                "name": "rawlevel",
+                                "displayString": "Raw Reading (ma)",
+                                "varType": "float",
+                                "decPrecision": 2
+                            },
+                            "rawlevel_processed": {
+                                "type": "uiVariable",
+                                "name": "rawlevel_processed",
+                                "displayString": "Raw Reading (cm)",
+                                "varType": "float",
+                                "decPrecision": 1
+                            },
+                            "rawBattery": {
+                                "type": "uiVariable",
+                                "name": "rawBattery",
+                                "displayString": "Battery (V)",
+                                "varType": "float",
+                                "decPrecision": 2
                             },
                             "lastRSSI": {
                                 "type": "uiVariable",
@@ -348,17 +355,23 @@ class target:
         state_obj = state_channel.get_aggregate()
         cmds_obj = cmds_channel.get_aggregate()
 
+        batt_percent = None
+        try:
+            batt_volts = state_obj['state']['children']['details_submodule']['children']['rawBattery']['currentValue']
+            batt_percent = self.batt_volts_to_percent(batt_volts) * 100
+        except Exception as e:
+            self.add_to_log("Could not get battery raw volts - " + str(e))
+
         raw_reading_1 = None
         try:
             raw_reading_1 = state_obj['state']['children']['details_submodule']['children']['rawlevel']['currentValue']
         except Exception as e:
             self.add_to_log("Could not get current raw reading - " + str(e))
-            return
 
         tank_type = "flatBottom"
         try:
             # sensor_1_type = state_obj['state']['children']['details_submodule']['children']['input1_setup_submodule']['children']['']
-            sensor_1_type = cmds_obj['cmds']['tankType']
+            tank_type = cmds_obj['cmds']['tankType']
         except Exception as e:
             self.add_to_log("Could not get tank type - " + str(e))
 
@@ -382,7 +395,7 @@ class target:
 
         input1_processed = None
         input1_percentage_level = None
-        if raw_reading_1 > 3.8:
+        if raw_reading_1 is not None and raw_reading_1 > 3.8:
             # if sensor_1_type == "submersibleLevel":
             input1_processed = int( (raw_reading_1 - 4) * 0.1875 * 1.6 * 100 )
             input1_processed = (input1_processed + sensor_1_zero_cal) * sensor_1_scaling_cal
@@ -400,6 +413,9 @@ class target:
                     "level" : {
                         "currentValue" : input1_percentage_level
                     },
+                    "batteryLevel" : {
+                        "currentValue" : batt_percent
+                    },
                     "details_submodule" : {
                         "children" : {
                             "rawlevel" : {
@@ -416,6 +432,15 @@ class target:
         state_channel.publish(
             msg_str=json.dumps(msg_obj),
         )
+
+    def batt_volts_to_percent(self, volts):
+        if volts < 3.3:
+            return 0
+        if volts < 3.6:
+            volts == 3300
+            return ((volts - 3.3) * (1/3))
+
+        return 10 + ((volts - 3.6) * 1.5)
 
     def assess_warnings(self, cmds_channel, state_channel):
         cmds_obj = cmds_channel.get_aggregate()

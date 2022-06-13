@@ -66,13 +66,13 @@
 */
 
 uint8_t node_device_eui[8] = { {{ dev_eui_msb_array }} };
-// uint8_t node_device_eui[8] = {0x00, 0x0D, 0x75, 0xE6, 0x56, 0x4D, 0xC1, 0xF3};
+// uint8_t node_device_eui[8] = { 0x70, 0xB3, 0xD5, 0x7E, 0xD0, 0x05, 0x1E, 0x75 };
 
 uint8_t node_app_eui[8] = { {{ join_eui_msb_array }} };
-// uint8_t node_app_eui[8] = {0x70, 0xB3, 0xD5, 0x7E, 0xD0, 0x02, 0x01, 0xE1};
+// uint8_t node_app_eui[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
 uint8_t node_app_key[16] = { {{ app_key_msb_array }} };
-// uint8_t node_app_key[16] = {0x2B, 0x84, 0xE0, 0xB0, 0x9B, 0x68, 0xE5, 0xCB, 0x42, 0x17, 0x6F, 0xE7, 0x53, 0xDC, 0xEE, 0x79};
+// uint8_t node_app_key[16] = { 0x83, 0xCB, 0xB1, 0x10, 0x45, 0x87, 0x70, 0x5C, 0xBD, 0x8C, 0x0B, 0xF8, 0x0F, 0xAB, 0x31, 0x04 };
 
 // uint8_t node_nws_key[16] = {0x32, 0x3D, 0x15, 0x5A, 0x00, 0x0D, 0xF3, 0x35, 0x30, 0x7A, 0x16, 0xDA, 0x0C, 0x9D, 0xF5, 0x3F};
 // uint8_t node_apps_key[16] = {0x3F, 0x6A, 0x66, 0x45, 0x9D, 0x5E, 0xDC, 0xA6, 0x3C, 0xBC, 0x46, 0x19, 0xCD, 0x61, 0xA1, 0x1E};
@@ -164,7 +164,7 @@ void setup_app(void)
 	// memcpy(g_lorawan_settings.node_apps_key, node_apps_key, 16);	// ABP Application Session key MSB
 	// g_lorawan_settings.node_dev_addr = 0x26021FB4;					// ABP Device Address MSB
 	g_lorawan_settings.send_repeat_time = 120000;					// Send repeat time in milliseconds: 2 * 60 * 1000 => 2 minutes
-	g_lorawan_settings.adr_enabled = false;							// Flag for ADR on or off
+	g_lorawan_settings.adr_enabled = true;							// Flag for ADR on or off
 	g_lorawan_settings.public_network = true;						// Flag for public or private network
 	g_lorawan_settings.duty_cycle_enabled = false;					// Flag to enable duty cycle (validity depends on Region)
 	g_lorawan_settings.join_trials = 5;								// Number of join retries
@@ -309,6 +309,7 @@ void lora_data_handler(void)
 		/**************************************************************/
 		g_task_event_type &= N_LORA_DATA;
 		MYLOG("APP", "Received package over LoRa");
+		
 		char log_buff[g_rx_data_len * 3] = {0};
 		uint8_t log_idx = 0;
 		for (int idx = 0; idx < g_rx_data_len; idx++)
@@ -316,8 +317,45 @@ void lora_data_handler(void)
 			sprintf(&log_buff[log_idx], "%02X ", g_rx_lora_data[idx]);
 			log_idx += 3;
 		}
+		MYLOG("APP", "Message : %s", log_buff);
 		lora_busy = false;
-		MYLOG("APP", "%s", log_buff);
+		
+		if (g_rx_data_len == 2){
+			// This is a burst mode message
+			MYLOG("APP", "Recieved a new burst mode message");
+
+			uint32_t new_counter = g_rx_lora_data[0] << 8;
+			new_counter |= g_rx_lora_data[1];
+
+			burst_mode_counter = new_counter;
+			sleep_time = burst_mode_sleep_time;
+
+			// After setting a new burst mode counter time, send a new packet to update the reported sleep interval  
+			send_periodic_lora_frame();
+			api_timer_restart(sleep_time);
+		}
+		else {
+
+			// Assuming the new time is encoded as 3 bytes. e.g. 30=> 0x00, 0x00, 0x1F
+			// Downlink must be sent on Port2
+			// Downlink is in seconds
+			uint32_t new_time = g_rx_lora_data[0] << 16;
+			new_time |= g_rx_lora_data[1] << 8;
+			new_time |= g_rx_lora_data[2];
+			
+			sleep_time = new_time * 1000;
+			default_sleep_time = sleep_time; // Set the default long sleep time to this as well, so it will revert to this again after burst mode
+			
+			MYLOG("APP", "New uplink time set %i", new_time);
+	
+			// If a new sleep time is set manually, then forget about the init fast counter
+			burst_mode_counter = 0;
+	
+			// After setting a new sleep time, send a new packet to update the reported sleep interval
+			send_periodic_lora_frame();
+			api_timer_restart(sleep_time);
+		}
+
 	}
 
 	// LoRa TX finished handling
@@ -390,7 +428,7 @@ bool send_periodic_lora_frame(void)
 	}
 	if (burst_mode_counter > 0){
 		burst_mode_counter = burst_mode_counter - 1;
-		MYLOG("APP", "%i More fast sleeps for startup", burst_mode_counter);
+		MYLOG("APP", "%i more messages in burst mode", burst_mode_counter);
 	}
   
 
@@ -433,10 +471,10 @@ bool send_periodic_lora_frame(void)
     current_sensor = voltage_ain / 149.9 * 1000;    //WisBlock RAK5801 I=U/149.9\*1000 (mA)
     int current_sensor_payload = current_sensor * 1000;
     
-	MYLOG("APP", "-------Current Sensor------ =  %f\n", current_sensor);
-	MYLOG("APP", "--Current Sensor Payload--- =  %d\n", current_sensor_payload);
-	MYLOG("APP", "-----Batt Voltage (mV)----- =  %d\n", vbat_mv);
-	MYLOG("APP", "------Batt Level (%)------- =  %d\n", vbat_per);
+	MYLOG("APP", "-------Current Sensor------ =  %f", current_sensor);
+	MYLOG("APP", "--Current Sensor Payload--- =  %d", current_sensor_payload);
+	MYLOG("APP", "-----Batt Voltage (mV)----- =  %d", vbat_mv);
+	MYLOG("APP", "------Batt Level (Percent)------- =  %d", vbat_per);
 	
 
 	// Compile the lora packet
@@ -446,11 +484,12 @@ bool send_periodic_lora_frame(void)
 	m_lora_app_data_buffer[buffSize++] = highByte(current_sensor_payload);
 	m_lora_app_data_buffer[buffSize++] = lowByte(current_sensor_payload);
 	m_lora_app_data_buffer[buffSize++] = 0; // Reserved for second sensor
-	m_lora_app_data_buffer[buffSize++] = vbat_per;
+	m_lora_app_data_buffer[buffSize++] = 0; // Reserved for second sensor
 	m_lora_app_data_buffer[buffSize++] = vbat_mv / 20;
 	m_lora_app_data_buffer[buffSize++] = highByte(sleep_time / 1000);
 	m_lora_app_data_buffer[buffSize++] = lowByte(sleep_time / 1000);
 	m_lora_app_data_buffer[buffSize++] = burst_mode_counter;
+	// m_lora_app_data_buffer[buffSize++] = vbat_per;
 	
 	//  m_lora_app_data_buffer[buffSize++] = 'l';
 	//  m_lora_app_data_buffer[buffSize++] = 'o';
