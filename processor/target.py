@@ -336,7 +336,7 @@ class target:
         self._log = self._log + str(msg) + "\n"
 
     def complete_log(self):
-        if hasattr(self, '_log') and self.log is not None:
+        if hasattr(self, '_log') and self._log is not None:
             log_channel = self.cli.get_channel( channel_id=self.kwargs['log_channel'] )
             log_channel.publish(
                 msg_str=self._log
