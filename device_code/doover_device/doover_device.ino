@@ -96,7 +96,7 @@ uint32_t sleep_time = burst_mode_sleep_time;
 
 // Battery Voltage
 #define PIN_VBAT WB_A0
-uint32_t vbat_pin = PIN_VBAT;
+uint32_t batt_volts_pin = PIN_VBAT;
 
 #define VBAT_MV_PER_LSB (0.73242188F) // 3.0V ADC range and 12 - bit ADC resolution = 3000mV / 4096
 #define VBAT_DIVIDER_COMP (1.73)      // Compensation factor for the VBAT divider, depend on the board
@@ -135,11 +135,11 @@ void setup_app(void)
 	}
 	digitalWrite(LED_GREEN, LOW);
 
-	MYLOG("APP", "Setup WisBlock API Example");
+	MYLOG("APP", "Setup Doover RAK4631 Node");
 
 #ifdef NRF52_SERIES
 	// Enable BLE
-	g_enable_ble = true;
+  	g_enable_ble = false;
 #endif
 
 	// Set firmware version
@@ -175,7 +175,7 @@ void setup_app(void)
 	g_lorawan_settings.app_port = 2;								// Data port to send data
 	g_lorawan_settings.confirmed_msg_enabled = LMH_UNCONFIRMED_MSG; // Flag to enable confirmed messages
 	g_lorawan_settings.resetRequest = true;							// Command from BLE to reset device
-	g_lorawan_settings.lora_region = LORAMAC_REGION_AS923_3;		// LoRa region
+	g_lorawan_settings.lora_region = LORAMAC_REGION_AU915;		// LoRa region
 	// Save LoRaWAN settings
 	api_set_credentials();
 }
@@ -351,7 +351,7 @@ float readVBAT(void)
 
 	// Get the raw 12-bit, 0..3000mV ADC value
 	analogReadResolution(12);
-	raw = analogRead(vbat_pin);
+	raw = analogRead(batt_volts_pin);
 	delay(50);
 	analogReadResolution(10);
 

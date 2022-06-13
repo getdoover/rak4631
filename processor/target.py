@@ -246,19 +246,19 @@ class target:
                                 "min": 0,
                                 "max": 100
                             },
-                            "burstMode": {
-                                "type": "uiAction",
-                                "name": "burstMode",
-                                "displayString": "Burst Mode",
-                                "colour": "blue",
-                                "requiresConfirm": True
-                            },
                             "uplinkIntervalMins": {
                                 "type": "uiFloatParam",
                                 "name": "uplinkIntervalMins",
                                 "displayString": "Reporting Interval (mins)",
                                 "min": 0.1,
                                 "max": 999
+                            },
+                            "burstMode": {
+                                "type": "uiAction",
+                                "name": "burstMode",
+                                "displayString": "Burst Mode",
+                                "colour": "blue",
+                                "requiresConfirm": True
                             },
                             "lastRSSI": {
                                 "type": "uiVariable",
