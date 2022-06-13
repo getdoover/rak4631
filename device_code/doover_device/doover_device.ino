@@ -162,16 +162,16 @@ void setup_app(void)
 	memcpy(g_lorawan_settings.node_app_key, node_app_key, 16);		// OTAA Application Key MSB
 	// memcpy(g_lorawan_settings.node_nws_key, node_nws_key, 16);		// ABP Network Session Key MSB
 	// memcpy(g_lorawan_settings.node_apps_key, node_apps_key, 16);	// ABP Application Session key MSB
-	g_lorawan_settings.node_dev_addr = 0x26021FB4;					// ABP Device Address MSB
+	// g_lorawan_settings.node_dev_addr = 0x26021FB4;					// ABP Device Address MSB
 	g_lorawan_settings.send_repeat_time = 120000;					// Send repeat time in milliseconds: 2 * 60 * 1000 => 2 minutes
 	g_lorawan_settings.adr_enabled = false;							// Flag for ADR on or off
 	g_lorawan_settings.public_network = true;						// Flag for public or private network
 	g_lorawan_settings.duty_cycle_enabled = false;					// Flag to enable duty cycle (validity depends on Region)
 	g_lorawan_settings.join_trials = 5;								// Number of join retries
-	g_lorawan_settings.tx_power = 0;								// TX power 0 .. 15 (validity depends on Region)
+	g_lorawan_settings.tx_power = 22;								// TX power 0 .. 15 (validity depends on Region)
 	g_lorawan_settings.data_rate = 3;								// Data rate 0 .. 15 (validity depends on Region)
 	g_lorawan_settings.lora_class = 0;								// LoRaWAN class 0: A, 2: C, 1: B is not supported
-	g_lorawan_settings.subband_channels = 1;						// Subband channel selection 1 .. 9
+	g_lorawan_settings.subband_channels = 2;						// Subband channel selection 1 .. 9
 	g_lorawan_settings.app_port = 2;								// Data port to send data
 	g_lorawan_settings.confirmed_msg_enabled = LMH_UNCONFIRMED_MSG; // Flag to enable confirmed messages
 	g_lorawan_settings.resetRequest = true;							// Command from BLE to reset device
@@ -218,25 +218,26 @@ void app_event_handler(void)
 		else
 		{
 
-			// Dummy packet
+			send_periodic_lora_frame();
 
-			uint8_t dummy_packet[] = {0x10, 0x00, 0x00};
+			// // Dummy packet
+			// uint8_t dummy_packet[] = {0x10, 0x00, 0x00};
+			// lmh_error_status result = send_lora_packet(dummy_packet, 3);
 
-			lmh_error_status result = send_lora_packet(dummy_packet, 3);
-			switch (result)
-			{
-			case LMH_SUCCESS:
-				MYLOG("APP", "Packet enqueued");
-				// Set a flag that TX cycle is running
-				lora_busy = true;
-				break;
-			case LMH_BUSY:
-				MYLOG("APP", "LoRa transceiver is busy");
-				break;
-			case LMH_ERROR:
-				MYLOG("APP", "Packet error, too big to send with current DR");
-				break;
-			}
+			// switch (result)
+			// {
+			// case LMH_SUCCESS:
+			// 	MYLOG("APP", "Packet enqueued");
+			// 	// Set a flag that TX cycle is running
+			// 	lora_busy = true;
+			// 	break;
+			// case LMH_BUSY:
+			// 	MYLOG("APP", "LoRa transceiver is busy");
+			// 	break;
+			// case LMH_ERROR:
+			// 	MYLOG("APP", "Packet error, too big to send with current DR");
+			// 	break;
+			// }
 		}
 	}
 }
