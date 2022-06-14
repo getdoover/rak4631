@@ -320,6 +320,8 @@ class target:
 
         self.compute_output_levels(ui_cmds_channel, ui_state_channel)
         self.update_reported_signal_strengths(ui_cmds_channel, ui_state_channel)
+
+        ui_state_channel.update() ## Update the details stored in the state channel so that warnings are computed from current values
         self.assess_warnings(ui_cmds_channel, ui_state_channel)
 
 
@@ -484,6 +486,8 @@ class target:
 
         level_warning = None
         if level_alarm is not None and curr_level is not None and curr_level < level_alarm:
+            self.add_to_log("Sensor level is low")
+
             level_warning = {
                 "type": "uiWarningIndicator",
                 "name": "levelLowWarning",
@@ -502,9 +506,14 @@ class target:
                             "action_string" : "Level is getting low"
                         }
                     }))
+                else:
+                    self.add_to_log("Not sending low level notification as already sent notification recently")
+
 
         batt_warning = None
         if battery_alarm is not None and curr_battery_level is not None and curr_battery_level < battery_alarm:
+            self.add_to_log("Battery level is low")
+            
             batt_warning = {
                 "type": "uiWarningIndicator",
                 "name": "battLowWarning",
@@ -523,6 +532,9 @@ class target:
                             "action_string" : "Battery is getting low"
                         }
                     }))
+                else:
+                    self.add_to_log("Not sending low battery notification as already sent notification recently")
+
 
         ## Assess status icon
         status_icon = None
