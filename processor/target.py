@@ -512,7 +512,7 @@ class target:
             }
 
             prev_level = self.get_previous_level(state_channel, "batteryLevel")
-            if prev_level is not None and prev_level > level_alarm:
+            if prev_level is not None and prev_level > battery_alarm:
                 if last_notification_age is None or last_notification_age > (12 * 60 * 60):
                     self.add_to_log("Sending low battery notification")
                     notifications_channel.publish(
