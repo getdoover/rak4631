@@ -599,7 +599,7 @@ class target:
         notifications_messages = notifications_channel.get_messages()
 
         last_notification_age = None
-        if len(notifications_messages) > 1:
+        if len(notifications_messages) > 0:
             try:
                 last_notif_message = notifications_messages[0].update()
                 last_notification_age = last_notif_message['current_time'] - last_notif_message['timestamp']
