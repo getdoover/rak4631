@@ -434,13 +434,20 @@ class target:
         )
 
     def batt_volts_to_percent(self, volts):
+        
+        out_val = 0
         if volts < 3.3:
-            return 0
-        if volts < 3.6:
-            volts == 3300
-            return ((volts - 3.3) * (1/3))
+            out_val = 0
+        elif volts < 3.6:
+            out_val = ((volts - 3.3) * (1/3))
+        else:
+            out_val = 0.1 + ((volts - 3.6) * 1.5)
 
-        return 0.1 + ((volts - 3.6) * 1.5)
+        out_val = max(out_val, 0)
+        out_val = min(out_val, 1)
+
+        return out_val
+        
 
     def assess_warnings(self, cmds_channel, state_channel):
         cmds_obj = cmds_channel.get_aggregate()
