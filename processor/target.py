@@ -264,6 +264,11 @@ class target:
             }
         }
 
+        self.add_to_log( ui_state_channel )
+        self.add_to_log( ui_state_channel.agent_id )
+        self.add_to_log( ui_state_channel.channel_name )
+        self.add_to_log( ui_state_channel.channel_id )
+
         ui_state_channel.publish(
             msg_str=json.dumps(ui_obj)
         )
