@@ -300,6 +300,7 @@ class target:
         
         self.send_uplink_interval_if_required()
         self.send_burst_mode_if_required()
+        self.reset_rainfall_event_if_required()
 
 
     def create_doover_client(self):
