@@ -83,14 +83,19 @@ bool init_app(void);
 void app_event_handler(void);
 void ble_data_handler(void) __attribute__((weak));
 void lora_data_handler(void);
+bool handle_interrupt(void);
 bool send_periodic_lora_frame(void);
 
+/** Application Stuff */
+uint64_t total_counts = 0;
+uint32_t last_message_counts = 0;
 
-/** Application stuff */
-uint32_t burst_mode_sleep_time = 30 * 1000; // 30 seconds
-uint32_t burst_mode_counter = 20;
 
-uint32_t default_sleep_time = 10 * 60 * 1000; // 10 minutes
+/** Burst Mode Stuff */
+uint32_t burst_mode_sleep_time = 60 * 1000; // 60 seconds
+uint32_t burst_mode_counter = 10;
+
+uint32_t default_sleep_time = 20 * 60 * 1000; // 20 minutes
 uint32_t sleep_time = burst_mode_sleep_time;
 
 
@@ -188,7 +193,26 @@ void setup_app(void)
 bool init_app(void)
 {
 	MYLOG("APP", "init_app");
+
+	// Setup the pin and interrupt for tipping spoon counter
+	pinMode(WB_IO3, INPUT);
+	attachInterrupt(WB_IO3, handle_interrupt, RISING);
+
 	return true;
+}
+
+
+/**
+   @brief Application specific event handler
+          Handles the configured interrupt pin and awakens the unit to increment the rainfall count
+*/
+void pir_triggered(void)
+{
+	// Define the event type
+	g_task_event_type |= PIR_TRIGGER;
+	// Wake up the handler, it will check g_task_event_type and know that he has to handle an PIR alarm.
+	xSemaphoreGiveFromISR(g_task_sem, pdFALSE);
+
 }
 
 /**
@@ -217,28 +241,21 @@ void app_event_handler(void)
 		}
 		else
 		{
-
 			send_periodic_lora_frame();
-
-			// // Dummy packet
-			// uint8_t dummy_packet[] = {0x10, 0x00, 0x00};
-			// lmh_error_status result = send_lora_packet(dummy_packet, 3);
-
-			// switch (result)
-			// {
-			// case LMH_SUCCESS:
-			// 	MYLOG("APP", "Packet enqueued");
-			// 	// Set a flag that TX cycle is running
-			// 	lora_busy = true;
-			// 	break;
-			// case LMH_BUSY:
-			// 	MYLOG("APP", "LoRa transceiver is busy");
-			// 	break;
-			// case LMH_ERROR:
-			// 	MYLOG("APP", "Packet error, too big to send with current DR");
-			// 	break;
-			// }
 		}
+	}
+
+	// Check if it is a PIR trigger event
+	if ((g_task_event_type & PIR_TRIGGER) == PIR_TRIGGER)
+	{
+		/**************************************************************/
+		/// \todo IMPORTANT, YOU MUST CLEAR THE EVENT FLAG HERE
+		/**************************************************************/
+		g_task_event_type &= N_PIR_TRIGGER;
+		MYLOG("APP", "PIR triggered");
+
+		total_counts += 1
+		last_message_counts += 1;
 	}
 }
 
@@ -445,35 +462,10 @@ bool send_periodic_lora_frame(void)
 	uint8_t vbat_per = mvToPercent(vbat_mv);
 	
 
-	// Make a sensor reading
-    int sensor_pin = A1;   // select the input pin for the potentiometer
-    int mcu_ain_value = 0;  
-    int average_value;  
-    float voltage_ain;
-    float current_sensor; // variable to store the value coming from the sensor
-
-	/* WisBLOCK 5801 Power On*/
-	pinMode(WB_IO1, OUTPUT);
-	digitalWrite(WB_IO1, HIGH);
-	delay(500);
-	/* WisBLOCK 5801 Power On*/
-
-	// Take 10 readings, then get the average
-    int i;
-	for (i = 0; i < 10; i++){ mcu_ain_value += analogRead(sensor_pin); }
-
-    /* WisBLOCK 5801 Power Off*/
-  	digitalWrite(WB_IO1, LOW);
-    /* WisBLOCK 5801 Power Off*/
-
-    average_value = mcu_ain_value / i;
-    voltage_ain = average_value * 3.6 /1024;      //raef 3.6v / 10bit ADC
-    current_sensor = voltage_ain / 149.9 * 1000;    //WisBlock RAK5801 I=U/149.9\*1000 (mA)
-    int current_sensor_payload = current_sensor * 1000;
-    
-	MYLOG("APP", "-------Current Sensor------ =  %f", current_sensor);
-	MYLOG("APP", "--Current Sensor Payload--- =  %d", current_sensor_payload);
-	MYLOG("APP", "-----Batt Voltage (mV)----- =  %d", vbat_mv);
+	MYLOG("APP", "--------Total Counts------- =  %i", total_counts);
+	MYLOG("APP", "--Counts For This Message-- =  %i", last_message_counts);
+	MYLOG("APP", "------Total Rainfall------ =  %f", (total_counts * 0.2));
+	MYLOG("APP", "------Batt Voltage (mv)------ =  %d", vbat_mv );
 	MYLOG("APP", "------Batt Level (Percent)------- =  %d", vbat_per);
 	
 
@@ -481,24 +473,31 @@ bool send_periodic_lora_frame(void)
 	uint8_t m_lora_app_data_buffer[64]; // Max 64 bytes long
 
 	uint32_t buffSize = 0;
-	m_lora_app_data_buffer[buffSize++] = highByte(current_sensor_payload);
-	m_lora_app_data_buffer[buffSize++] = lowByte(current_sensor_payload);
-	m_lora_app_data_buffer[buffSize++] = 0; // Reserved for second sensor
-	m_lora_app_data_buffer[buffSize++] = 0; // Reserved for second sensor
+	m_lora_app_data_buffer[buffSize++] = (total_counts >> 56) & 0xFF;
+	m_lora_app_data_buffer[buffSize++] = (total_counts >> 48) & 0xFF;
+	m_lora_app_data_buffer[buffSize++] = (total_counts >> 40) & 0xFF;
+	m_lora_app_data_buffer[buffSize++] = (total_counts >> 32) & 0xFF;
+	m_lora_app_data_buffer[buffSize++] = (total_counts >> 24) & 0xFF;
+	m_lora_app_data_buffer[buffSize++] = (total_counts >> 16) & 0xFF;
+	m_lora_app_data_buffer[buffSize++] = (total_counts >> 8) & 0xFF;
+	m_lora_app_data_buffer[buffSize++] = (total_counts) & 0xFF;
+	m_lora_app_data_buffer[buffSize++] = highByte(last_message_counts);
+	m_lora_app_data_buffer[buffSize++] = lowByte(last_message_counts);
 	m_lora_app_data_buffer[buffSize++] = vbat_mv / 20;
 	m_lora_app_data_buffer[buffSize++] = highByte(sleep_time / 1000);
 	m_lora_app_data_buffer[buffSize++] = lowByte(sleep_time / 1000);
 	m_lora_app_data_buffer[buffSize++] = burst_mode_counter;
 	// m_lora_app_data_buffer[buffSize++] = vbat_per;
 	
-	//  m_lora_app_data_buffer[buffSize++] = 'l';
-	//  m_lora_app_data_buffer[buffSize++] = 'o';
 
 	lmh_app_data_t m_lora_app_data = {m_lora_app_data_buffer, 0, 0, 0, 0};
 	m_lora_app_data.buffsize = buffSize;
 	m_lora_app_data.port = 2;
 
 	lmh_error_status error = lmh_send(&m_lora_app_data, LMH_UNCONFIRMED_MSG);
+
+	// Reset the last message counts to 0
+	last_message_counts = 0;
 
 	MYLOG("APP", "Packet Sent");
 	return (error == 0);

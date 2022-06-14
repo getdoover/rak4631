@@ -1,5 +1,4 @@
 #!/usr/bin/python3
-from operator import truediv
 import os, sys, time, json, math
 from signal import signal
 
@@ -82,38 +81,29 @@ class target:
                     "significantEvent": {
                         "type": "uiAlertStream",
                         "name": "significantEvent",
-                        "displayString": "Notify me of any problems"
+                        "displayString": "SMS after rain event"
                     },
-                    "level": {
+                    "rainfallEvent": {
                         "type": "uiVariable",
-                        "name": "level",
-                        "displayString": "Level (%)",
+                        "name": "rainfallEvent",
+                        "displayString": "Rainfall (mm)",
                         "varType": "float",
                         "decPrecision": 1,
-                        "form": "radialGauge",
-                        "ranges": [
-                            {
-                                "label" : "Low",
-                                "min" : 0,
-                                "max" : 40,
-                                "colour" : "yellow",
-                                "showOnGraph" : True
-                            },
-                            {
-                                "label" : "Half",
-                                "min" : 40,
-                                "max" : 80,
-                                "colour" : "blue",
-                                "showOnGraph" : True
-                            },
-                            {
-                                "label" : "Full",
-                                "min" : 80,
-                                "max" : 100,
-                                "colour" : "green",
-                                "showOnGraph" : True
-                            }
-                        ]
+                    },
+                    "resetRainEvent": {
+                        "type": "uiAction",
+                        "name": "resetRainEvent",
+                        "displayString": "Reset Event",
+                        "colour": "blue",
+                        "requiresConfirm": True
+                    },
+                    "lastTimeNonZeroUpdate": {
+                        "type": "uiHiddenValue",
+                        "name": "lastTimeNonZeroUpdate"
+                    },
+                    "eventZeroCounts": {
+                        "type": "uiHiddenValue",
+                        "name": "eventZeroCounts"
                     },
                     "batteryLevel": {
                         "type": "uiVariable",
@@ -180,50 +170,19 @@ class target:
                         "name": "details_submodule",
                         "displayString": "Details",
                         "children": {
-                            "tankType": {
-                                "type": "uiStateCommand",
-                                "name": "tankType",
-                                "displayString": "Tank Type",
-                                "userOptions": {
-                                    "flatBottom": {
-                                        "type": "uiElement",
-                                        "name": "flatBottom",
-                                        "displayString": "Flat Bottom"
-                                    },
-                                    "horizontalCylinder": {
-                                        "type": "uiElement",
-                                        "name": "horizontalCylinder",
-                                        "displayString": "Horizontal Cylinder"
-                                    }
-                                }
-                            },
-                            "inputMax": {
+                            "resetAfter": {
                                 "type": "uiFloatParam",
-                                "name": "inputMax",
-                                "displayString": "Max Level (cm)",
+                                "name": "resetAfter",
+                                "displayString": "Clear event after (hours)",
                                 "min": 0,
                                 "max": 999
                             },
-                            "inputLowLevel": {
+                            "mmPerCount": {
                                 "type": "uiFloatParam",
-                                "name": "inputLowLevel",
-                                "displayString": "Low level alarm (%)",
-                                "min": 0,
-                                "max": 99
-                            },
-                            "inputZeroCal": {
-                                "type": "uiFloatParam",
-                                "name": "inputZeroCal",
-                                "displayString": "Zero Calibration (cm)",
-                                "min": -999,
-                                "max": 999
-                            },
-                            "inputScalingCal": {
-                                "type": "uiFloatParam",
-                                "name": "inputScalingCal",
-                                "displayString": "Scaling Calibration (x multiply)",
-                                "min": -999,
-                                "max": 999
+                                "name": "mmPerCount",
+                                "displayString": "mm per tip (mm)",
+                                "min": 0.001,
+                                "max": 10
                             },
                             "battAlarmLevel": {
                                 "type": "uiFloatParam",
@@ -246,17 +205,24 @@ class target:
                                 "colour": "blue",
                                 "requiresConfirm": True
                             },
-                            "rawlevel": {
+                            "totalCounts": {
                                 "type": "uiVariable",
-                                "name": "rawlevel",
-                                "displayString": "Raw Reading (ma)",
+                                "name": "totalCounts",
+                                "displayString": "Raw Counts",
                                 "varType": "float",
-                                "decPrecision": 2
+                                "decPrecision": 0
                             },
-                            "rawlevel_processed": {
+                            "lastCounts": {
                                 "type": "uiVariable",
-                                "name": "rawlevel_processed",
-                                "displayString": "Raw Reading (cm)",
+                                "name": "lastCounts",
+                                "displayString": "Last Counts",
+                                "varType": "float",
+                                "decPrecision": 0
+                            },
+                            "lastRain": {
+                                "type": "uiVariable",
+                                "name": "lastRain",
+                                "displayString": "Last mm (mm)",
                                 "varType": "float",
                                 "decPrecision": 1
                             },
@@ -351,12 +317,20 @@ class target:
                 msg_str=self._log
             )
 
+    def get_current_time(self):
+        msg_obj = self.kwargs['msg_obj']
+        if msg_obj is not None and 'current_time' in msg_obj:
+            return msg_obj['current_time']
+        return None
+
     ## Compute output values from raw values
     def compute_output_levels(self, cmds_channel, state_channel):
 
         state_obj = state_channel.get_aggregate()
         cmds_obj = cmds_channel.get_aggregate()
 
+
+        ## Accumulate all of the data
         batt_percent = None
         try:
             batt_volts = state_obj['state']['children']['details_submodule']['children']['rawBattery']['currentValue']
@@ -364,68 +338,111 @@ class target:
         except Exception as e:
             self.add_to_log("Could not get battery raw volts - " + str(e))
 
-        raw_reading_1 = None
+        mm_per_count = 0.2
         try:
-            raw_reading_1 = state_obj['state']['children']['details_submodule']['children']['rawlevel']['currentValue']
+            mm_per_count = cmds_obj['cmds']['mmPerCount']
         except Exception as e:
-            self.add_to_log("Could not get current raw reading - " + str(e))
+            self.add_to_log("Could not get mm per count override - " + str(e))
 
-        tank_type = "flatBottom"
+        total_counts = 0
         try:
-            # sensor_1_type = state_obj['state']['children']['details_submodule']['children']['input1_setup_submodule']['children']['']
-            tank_type = cmds_obj['cmds']['tankType']
+            total_counts = state_obj['state']['children']['details_submodule']['children']['totalCounts']['currentValue']
         except Exception as e:
-            self.add_to_log("Could not get tank type - " + str(e))
+            self.add_to_log("Could not get total raw counts - " + str(e))
 
-        sensor_1_max = 250
+        last_counts = 0
         try:
-            sensor_1_max = cmds_obj['cmds']['inputMax']
+            last_counts = state_obj['state']['children']['details_submodule']['children']['lastCounts']['currentValue']
         except Exception as e:
-            self.add_to_log("Could not get sensor max - " + str(e))
+            self.add_to_log("Could not get last raw counts - " + str(e))
 
-        sensor_1_zero_cal = 0
+        last_event_total = None
         try:
-            sensor_1_zero_cal = cmds_obj['cmds']['inputZeroCal']
+            last_event_total = state_obj['state']['children']['rainfallEvent']['currentValue']
         except Exception as e:
-            self.add_to_log("Could not get sensor zero cal - " + str(e))
+            self.add_to_log("Could not get last event total - " + str(e))
 
-        sensor_1_scaling_cal = 1
+        event_zero_counts = 0
         try:
-            sensor_1_scaling_cal = cmds_obj['cmds']['inputScalingCal']
+            event_zero_counts = cmds_obj['cmds']['eventZeroCounts']
         except Exception as e:
-            self.add_to_log("Could not get sensor scaling cal - " + str(e))
+            self.add_to_log("Could not get event counter zero - " + str(e))
 
-        input1_processed = None
-        input1_percentage_level = None
-        if raw_reading_1 is not None and raw_reading_1 > 3.8:
-            # if sensor_1_type == "submersibleLevel":
-            input1_processed = int( (raw_reading_1 - 4) * 0.1875 * 1.6 * 100 )
-            input1_processed = (input1_processed + sensor_1_zero_cal) * sensor_1_scaling_cal
-            input1_percentage_level = round((input1_processed / sensor_1_max) * 100, 1)
+        last_non_zero_update = self.get_current_time()
+        try:
+            last_non_zero_update = cmds_obj['cmds']['lastTimeNonZeroUpdate']
+        except Exception as e:
+            self.add_to_log("Could not get last non-zero update time - " + str(e))
 
-        if tank_type == "horizontalCylinder":
-            # https://www.mathsisfun.com/geometry/cylinder-horizontal-volume.html
-            r = 50 ## 50 %
-            h = input1_percentage_level
-            input1_percentage_level = (math.acos((r-h)/r)*(r*r)) - ((r-h)*math.sqrt(2*r*h-(h*h)))
+        reset_event_after = 24
+        try:
+            reset_event_after = cmds_obj['cmds']['resetAfter']
+        except Exception as e:
+            self.add_to_log("Could not get reset event after x hours - " + str(e))
+
+
+        ####  Do the calculations
+        last_rain = None
+        if last_counts is not None:
+            last_rain = last_counts * mm_per_count
+
+        new_last_non_zero_update = last_non_zero_update
+        current_time = self.get_current_time()
+        if last_counts > 0:
+            new_last_non_zero_update = current_time            
+
+
+        ## Calculate the new event counter zero
+        new_event_zero_counts = total_counts
+        if event_zero_counts < total_counts: ## The device has restarted - reset the total
+            new_event_zero_counts = 0
+            if last_event_total is not None and last_event_total != 0:
+                last_event_counts = last_event_total / mm_per_count
+                new_event_zero_counts = -last_event_counts
+
+        event_rainfall = (total_counts - new_event_zero_counts) * mm_per_count
+
+        notification_msg = None
+        if ((new_event_zero_counts < total_counts) and 
+            (current_time - new_last_non_zero_update > (reset_event_after * 60 * 60))):
+            ## Reset the counter
+            new_event_zero_counts = total_counts
+
+            notification_msg = "You've had " + str( round(event_rainfall, 1) ) + "mm"
+
+
+        ## Assess status icon
+        status_icon = None
+        if event_rainfall == 0:
+            status_icon = "idle"
+
+
+        ## Make the publications
+        cmds_obj = {
+            "cmds" : {
+                "eventZeroCounts" : new_event_zero_counts,
+                "lastTimeNonZeroUpdate" : new_last_non_zero_update
+            }
+        }
+        cmds_channel.publish(
+            msg_str=json.dumps(cmds_obj),
+        )
 
         msg_obj = {
             "state" : {
+                "statusIcon" : status_icon,
                 "children" : {
-                    "level" : {
-                        "currentValue" : input1_percentage_level
+                    "rainfallEvent" : {
+                        "currentValue" : event_rainfall
                     },
                     "batteryLevel" : {
                         "currentValue" : batt_percent
                     },
                     "details_submodule" : {
                         "children" : {
-                            "rawlevel" : {
-                                "currentValue" : raw_reading_1
+                            "lastRain" : {
+                                "currentValue" : last_rain
                             },
-                            "rawlevel_processed" : {
-                                "currentValue" : input1_processed
-                            }
                         }
                     }
                 }
@@ -434,6 +451,27 @@ class target:
         state_channel.publish(
             msg_str=json.dumps(msg_obj),
         )
+
+        if notification_msg is not None:
+            self.add_to_log("Sending rainfall event complete")
+            notifications_channel = pd.channel(
+                api_client=self.cli.api_client,
+                agent_id=self.kwargs['agent_id'],
+                channel_name='significantEvent',
+            )
+            activity_log_channel = pd.channel(
+                api_client=self.cli.api_client,
+                agent_id=self.kwargs['agent_id'],
+                channel_name='activity_logs',
+            )
+            notifications_channel.publish(
+                msg_str=notification_msg
+            )
+            activity_log_channel.publish(json.dumps({
+                "activity_log" : {
+                    "action_string" : notification_msg
+                }
+            }))
 
     def batt_volts_to_percent(self, volts):
         
@@ -453,20 +491,12 @@ class target:
 
     def assess_warnings(self, cmds_channel, state_channel):
         cmds_obj = cmds_channel.get_aggregate()
-        
-        level_alarm = None
-        try: level_alarm = cmds_obj['cmds']['inputLowLevel']
-        except Exception as e: self.add_to_log("Could not get level alarm")
 
         battery_alarm = None
         try: battery_alarm = cmds_obj['cmds']['battAlarmLevel']
         except Exception as e: self.add_to_log("Could not get battery alarm")
         
         state_obj = state_channel.get_aggregate()
-
-        curr_level = None
-        try: curr_level = state_obj['state']['children']['level']['currentValue']
-        except Exception as e: self.add_to_log("Could not get current level - " + str(e))
 
         curr_battery_level = None
         try: curr_battery_level = state_obj['state']['children']['batteryLevel']['currentValue']
@@ -483,32 +513,6 @@ class target:
             channel_name='activity_logs',
         )
         last_notification_age = self.get_last_notification_age()
-
-        level_warning = None
-        if level_alarm is not None and curr_level is not None and curr_level < level_alarm:
-            self.add_to_log("Sensor level is low")
-
-            level_warning = {
-                "type": "uiWarningIndicator",
-                "name": "levelLowWarning",
-                "displayString": "Level Low"
-            }
-            
-            prev_level = self.get_previous_level(state_channel, "level")
-            if prev_level is not None and prev_level > level_alarm:
-                if last_notification_age is None or last_notification_age > (12 * 60 * 60):
-                    self.add_to_log("Sending low level notification")
-                    notifications_channel.publish(
-                        msg_str="Level is getting low"
-                    )
-                    activity_log_channel.publish(json.dumps({
-                        "activity_log" : {
-                            "action_string" : "Level is getting low"
-                        }
-                    }))
-                else:
-                    self.add_to_log("Not sending low level notification as already sent notification recently")
-
 
         batt_warning = None
         if battery_alarm is not None and curr_battery_level is not None and curr_battery_level < battery_alarm:
@@ -535,26 +539,11 @@ class target:
                 else:
                     self.add_to_log("Not sending low battery notification as already sent notification recently")
 
-
-        ## Assess status icon
-        status_icon = None
-        if curr_level is None:
-            status_icon = "off"
-        else:
-            idle_icon_level = 60
-            if level_alarm is not None:
-                idle_icon_level = (100 + level_alarm) / 2   ## midpoint of full and alarm level
-            if curr_level < idle_icon_level:
-                status_icon = "idle"
-
-
         msg_obj = {
             "state" : {
                 "children" : {
                     "battLowWarning": batt_warning,
-                    "levelLowWarning": level_warning
-                },
-                "statusIcon" : status_icon
+                }
             }
         }
 
@@ -736,5 +725,63 @@ class target:
                 channel_name="tts_downlinks"
             )
             tts_dl_channel.publish(
+                msg_str=json.dumps(msg_obj),
+            )
+
+
+    def reset_rainfall_event_if_required(self):
+
+        trigger_payload = None
+        if 'msg_obj' in self.kwargs and self.kwargs['msg_obj'] is not None:
+            trigger_payload = self.kwargs['msg_obj']['payload']
+        
+        clear_rainfall_event = None
+        try:
+            # start_burst_mode = cmds_obj['cmds']['shouldReboot']
+            clear_rainfall_event = trigger_payload['cmds']['resetRainEvent']
+        except Exception as e:
+            self.add_to_log("Could not get 'resetRainEvent' in cmds object")
+            return
+
+        if clear_rainfall_event == True:
+            
+            ui_state_channel = self.cli.get_channel(
+                channel_name="ui_state",
+                agent_id=self.kwargs['agent_id']
+            )
+            state_obj = ui_state_channel.get_aggregate()
+
+            total_counts = 0
+            try:
+                total_counts = state_obj['state']['children']['details_submodule']['children']['totalCounts']['currentValue']
+            except Exception as e:
+                self.add_to_log("Could not get total raw counts - " + str(e))
+
+
+            msg_obj = {
+                'cmds' : {
+                    'resetRainEvent' : None,
+                    'eventZeroCounts' : total_counts
+                }
+            }
+
+            ui_cmds_channel = self.cli.get_channel(
+                channel_name="ui_cmds",
+                agent_id=self.kwargs['agent_id']
+            )
+            ui_cmds_channel.publish(
+                msg_str=json.dumps(msg_obj),
+            )
+
+            msg_obj = {
+                "state" : {
+                    "children" : {
+                        "rainfallEvent" : {
+                            "currentValue" : 0
+                        }
+                    }
+                }
+            }
+            ui_state_channel.publish(
                 msg_str=json.dumps(msg_obj),
             )

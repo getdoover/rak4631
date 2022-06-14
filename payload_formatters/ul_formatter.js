@@ -14,12 +14,26 @@ function decodeUplink(input) {
 
     var data = {};
 
-    data.current_reading = (input.bytes[0] << 8 | input.bytes[1]) / 1000;
-    // data.current_reading_2 = (input.bytes[2] << 8 | input.bytes[3]) / 1000;
-    data.batt_mvolts = input.bytes[4] * 20
-    data.sleep_time = (input.bytes[5] << 8 | input.bytes[6]);
-    data.fast_rate_counter = input.bytes[7];
-    data.batt_percent = input.bytes[3]
+    data.total_count = (
+        input.bytes[0] << 56 | 
+        input.bytes[1] << 48 | 
+        input.bytes[2] << 40 | 
+        input.bytes[3] << 32 | 
+        input.bytes[4] << 24 | 
+        input.bytes[5] << 16 | 
+        input.bytes[6] << 8 | 
+        input.bytes[7]
+    
+    );
+    data.last_count = (
+        input.bytes[8] << 8 | 
+        input.bytes[9]
+    );
+
+    data.batt_mvolts = input.bytes[10] * 20
+    data.sleep_time = (input.bytes[11] << 8 | input.bytes[12]);
+    data.fast_rate_counter = input.bytes[13];
+    // data.batt_percent = input.bytes[14]
 
     data.batt_volts = data.batt_mvolts / 1000
 
@@ -71,11 +85,11 @@ function decodeUplink(input) {
                     // },
                     details_submodule : {
                         children : {
-                            rawlevel : {
-                                currentValue : data.current_reading
+                            totalCounts : {
+                                currentValue : data.total_count
                             },
-                            rawBattery : {
-                                currentValue : data.batt_volts
+                            lastCounts : {
+                                currentValue : data.last_count
                             }
                         }
                     },
