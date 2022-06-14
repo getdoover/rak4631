@@ -440,7 +440,7 @@ class target:
             volts == 3300
             return ((volts - 3.3) * (1/3))
 
-        return 10 + ((volts - 3.6) * 1.5)
+        return 0.1 + ((volts - 3.6) * 1.5)
 
     def assess_warnings(self, cmds_channel, state_channel):
         cmds_obj = cmds_channel.get_aggregate()
@@ -624,7 +624,7 @@ class target:
             if rssi and snr and gateway_id:
                 
                 min_rssi = -130
-                max_rssi = -55
+                max_rssi = -50
                 signal_strength_percent = int(((rssi - max_rssi) / (max_rssi - min_rssi) + 1) * 100)
                 signal_strength_percent = max(signal_strength_percent, 0)
                 signal_strength_percent = min(signal_strength_percent, 100)
