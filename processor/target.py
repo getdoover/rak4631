@@ -68,9 +68,10 @@ class target:
         ## Run any deployment code here
         
         ## Get the deployment channel
-        ui_state_channel = self.cli.get_channel(
+        ui_state_channel = pd.channel(
+            api_client=self.cli.api_client,
             channel_name="ui_state",
-            agent_id=self.kwargs['agent_id']
+            agent_id=self.kwargs['agent_id'],
         )
 
         ui_obj = {
