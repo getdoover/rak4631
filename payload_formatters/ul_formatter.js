@@ -66,16 +66,16 @@ function decodeUplink(input) {
         ui_state : {
             state : {
                 children : {
-                    batteryLevel : {
-                        currentValue : data.batt_percent
-                    },
+                    // batteryLevel : {
+                    //     currentValue : data.batt_percent
+                    // },
                     details_submodule : {
                         children : {
-                            rawReading : {
+                            rawlevel : {
                                 currentValue : data.current_reading
                             },
                             rawBattery : {
-                                currentValue : data.batt_mvolts
+                                currentValue : data.batt_volts
                             }
                         }
                     },
@@ -89,7 +89,7 @@ function decodeUplink(input) {
         }
     }
 
-    if (fast_rate_reset_command != null){
+    if (fast_rate_reset_command !== null){
         data.doover_channels.ui_cmds = fast_rate_reset_command
     }
 

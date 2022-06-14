@@ -172,7 +172,7 @@ void setup_app(void)
 	g_lorawan_settings.data_rate = 3;								// Data rate 0 .. 15 (validity depends on Region)
 	g_lorawan_settings.lora_class = 0;								// LoRaWAN class 0: A, 2: C, 1: B is not supported
 	g_lorawan_settings.subband_channels = 2;						// Subband channel selection 1 .. 9
-	g_lorawan_settings.app_port = 2;								// Data port to send data
+	// g_lorawan_settings.app_port = 2;								// Data port to send data
 	g_lorawan_settings.confirmed_msg_enabled = LMH_UNCONFIRMED_MSG; // Flag to enable confirmed messages
 	g_lorawan_settings.resetRequest = true;							// Command from BLE to reset device
 	g_lorawan_settings.lora_region = LORAMAC_REGION_AU915;		// LoRa region
@@ -496,6 +496,7 @@ bool send_periodic_lora_frame(void)
 
 	lmh_app_data_t m_lora_app_data = {m_lora_app_data_buffer, 0, 0, 0, 0};
 	m_lora_app_data.buffsize = buffSize;
+	m_lora_app_data.port = 2;
 
 	lmh_error_status error = lmh_send(&m_lora_app_data, LMH_UNCONFIRMED_MSG);
 
