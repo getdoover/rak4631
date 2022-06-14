@@ -120,7 +120,7 @@ class target:
                         "name": "batteryLevel",
                         "displayString": "Battery (%)",
                         "varType": "float",
-                        "decPrecision": 2,
+                        "decPrecision": 0,
                         "ranges": [
                             {
                                 "label" : "Low",
@@ -150,7 +150,7 @@ class target:
                         "name": "signalStrength",
                         "displayString": "Signal Strength (%)",
                         "varType": "float",
-                        "decPrecision": 2,
+                        "decPrecision": 0,
                         "ranges": [
                             {
                                 "label" : "Low",
@@ -436,12 +436,12 @@ class target:
     def batt_volts_to_percent(self, volts):
         
         out_val = 0
-        if volts < 3.3:
+        if volts < 3.2:
             out_val = 0
-        elif volts < 3.6:
-            out_val = ((volts - 3.3) * (1/3))
+        elif volts < 3.5:
+            out_val = ((volts - 3.2) * (1/3))
         else:
-            out_val = 0.1 + ((volts - 3.6) * 1.5)
+            out_val = 0.1 + ((volts - 3.5) * 1.5)
 
         out_val = max(out_val, 0)
         out_val = min(out_val, 1)
