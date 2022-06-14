@@ -323,8 +323,8 @@ class target:
 
     def get_current_time(self):
         msg_obj = self.kwargs['msg_obj']
-        if msg_obj is not None and 'current_time' in msg_obj:
-            return msg_obj['current_time']
+        if msg_obj is not None and 'timestamp' in msg_obj:
+            return msg_obj['timestamp']
         return None
 
     ## Compute output values from raw values
