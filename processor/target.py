@@ -265,11 +265,6 @@ class target:
             }
         }
 
-        self.add_to_log( ui_state_channel )
-        self.add_to_log( ui_state_channel.agent_id )
-        self.add_to_log( ui_state_channel.channel_name )
-        self.add_to_log( ui_state_channel.channel_id )
-
         ui_state_channel.publish(
             msg_str=json.dumps(ui_obj)
         )
@@ -279,21 +274,24 @@ class target:
         ## Run any uplink processing code here
         
         ## Get the deployment channel
-        ui_state_channel = self.cli.get_channel(
+        ui_state_channel = pd.channel(
+            api_client=self.cli.api_client,
             channel_name="ui_state",
-            agent_id=self.kwargs['agent_id']
+            agent_id=self.kwargs['agent_id'],
         )
 
         ## Get the deployment channel
-        ui_cmds_channel = self.cli.get_channel(
+        ui_cmds_channel = pd.channel(
+            api_client=self.cli.api_client,
             channel_name="ui_cmds",
-            agent_id=self.kwargs['agent_id']
+            agent_id=self.kwargs['agent_id'],
         )
 
         self.compute_output_levels(ui_cmds_channel, ui_state_channel)
         self.update_reported_signal_strengths(ui_cmds_channel, ui_state_channel)
 
         ui_state_channel.update() ## Update the details stored in the state channel so that warnings are computed from current values
+        ui_cmds_channel.update() ## Update the details stored in the state channel so that warnings are computed from current values
         self.assess_warnings(ui_cmds_channel, ui_state_channel)
 
 
@@ -751,9 +749,10 @@ class target:
 
         if clear_rainfall_event == True:
             
-            ui_state_channel = self.cli.get_channel(
+            ui_state_channel = pd.channel(
+                api_client=self.cli.api_client,
                 channel_name="ui_state",
-                agent_id=self.kwargs['agent_id']
+                agent_id=self.kwargs['agent_id'],
             )
             state_obj = ui_state_channel.get_aggregate()
 
