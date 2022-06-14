@@ -15,24 +15,20 @@ function decodeUplink(input) {
     var data = {};
 
     data.total_count = (
-        input.bytes[0] << 56 | 
-        input.bytes[1] << 48 | 
-        input.bytes[2] << 40 | 
-        input.bytes[3] << 32 | 
-        input.bytes[4] << 24 | 
-        input.bytes[5] << 16 | 
-        input.bytes[6] << 8 | 
-        input.bytes[7]
+        input.bytes[0] << 24 | 
+        input.bytes[1] << 16 | 
+        input.bytes[2] << 8 | 
+        input.bytes[3]
     
     );
     data.last_count = (
-        input.bytes[8] << 8 | 
-        input.bytes[9]
+        input.bytes[4] << 8 | 
+        input.bytes[5]
     );
 
-    data.batt_mvolts = input.bytes[10] * 20
-    data.sleep_time = (input.bytes[11] << 8 | input.bytes[12]);
-    data.fast_rate_counter = input.bytes[13];
+    data.batt_mvolts = input.bytes[6] * 20
+    data.sleep_time = (input.bytes[7] << 8 | input.bytes[8]);
+    data.fast_rate_counter = input.bytes[9];
     // data.batt_percent = input.bytes[14]
 
     data.batt_volts = data.batt_mvolts / 1000

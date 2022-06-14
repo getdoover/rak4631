@@ -367,7 +367,7 @@ class target:
         except Exception as e:
             self.add_to_log("Could not get last event total - " + str(e))
 
-        event_zero_counts = 0
+        event_zero_counts = None
         try:
             event_zero_counts = cmds_obj['cmds']['eventZeroCounts']
         except Exception as e:
@@ -398,7 +398,9 @@ class target:
 
 
         ## Calculate the new event counter zero
-        new_event_zero_counts = total_counts
+        new_event_zero_counts = event_zero_counts
+        if event_zero_counts is None:
+            new_event_zero_counts = total_counts
         if event_zero_counts > total_counts: ## The device has restarted - reset the total
             new_event_zero_counts = 0
             if last_event_total is not None and last_event_total != 0:
