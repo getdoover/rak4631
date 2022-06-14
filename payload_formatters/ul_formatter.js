@@ -90,6 +90,9 @@ function decodeUplink(input) {
                             },
                             lastCounts : {
                                 currentValue : data.last_count
+                            },
+                            rawBattery : {
+                                currentValue : data.batt_volts
                             }
                         }
                     },
