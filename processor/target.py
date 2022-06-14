@@ -738,9 +738,15 @@ class target:
 
     def reset_rainfall_event_if_required(self):
 
-        trigger_payload = None
-        if 'msg_obj' in self.kwargs and self.kwargs['msg_obj'] is not None:
-            trigger_payload = self.kwargs['msg_obj']['payload']
+        ui_cmds_channel = pd.channel(
+            api_client=self.cli.api_client,
+            channel_name="ui_cmds",
+            agent_id=self.kwargs['agent_id'],
+        )
+        trigger_payload = ui_cmds_channel.get_aggregate()
+        # trigger_payload = None
+        # if 'msg_obj' in self.kwargs and self.kwargs['msg_obj'] is not None:
+        #     trigger_payload = self.kwargs['msg_obj']['payload']
         
         clear_rainfall_event = None
         try:
@@ -773,10 +779,6 @@ class target:
                 }
             }
 
-            ui_cmds_channel = self.cli.get_channel(
-                channel_name="ui_cmds",
-                agent_id=self.kwargs['agent_id']
-            )
             ui_cmds_channel.publish(
                 msg_str=json.dumps(msg_obj),
             )
