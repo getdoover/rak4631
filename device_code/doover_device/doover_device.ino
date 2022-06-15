@@ -57,6 +57,12 @@
 #define SW_VERSION_2 0 // minor version increase on API change / backward compatible
 #define SW_VERSION_3 0 // patch version increase on bugfix, no affect on API
 
+/** Examples for application events */
+#define PIR_TRIGGER   0b0000000000100000
+#define N_PIR_TRIGGER 0b1111111111011111
+#define BUTTON        0b0000000001000000
+#define N_BUTTON      0b1111111110111111
+
 /**
    Optional hard-coded LoRaWAN credentials for OTAA and ABP.
    It is strongly recommended to avoid duplicated node credentials
@@ -66,16 +72,14 @@
 */
 
 uint8_t node_device_eui[8] = { {{ dev_eui_msb_array }} };
-// uint8_t node_device_eui[8] = { 0x70, 0xB3, 0xD5, 0x7E, 0xD0, 0x05, 0x1E, 0x75 };
+// uint8_t node_device_eui[8] = { 0x70, 0xB3, 0xD5, 0x7E, 0xD0, 0x05, 0x20, 0x9A };
 
 uint8_t node_app_eui[8] = { {{ join_eui_msb_array }} };
 // uint8_t node_app_eui[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
 uint8_t node_app_key[16] = { {{ app_key_msb_array }} };
-// uint8_t node_app_key[16] = { 0x83, 0xCB, 0xB1, 0x10, 0x45, 0x87, 0x70, 0x5C, 0xBD, 0x8C, 0x0B, 0xF8, 0x0F, 0xAB, 0x31, 0x04 };
+// uint8_t node_app_key[16] = { 0xED, 0x69, 0xB2, 0x94, 0x04, 0x6E, 0x3A, 0xDA, 0x08, 0xC9, 0x60, 0x2A, 0x01, 0x49, 0xA8, 0x44 };
 
-// uint8_t node_nws_key[16] = {0x32, 0x3D, 0x15, 0x5A, 0x00, 0x0D, 0xF3, 0x35, 0x30, 0x7A, 0x16, 0xDA, 0x0C, 0x9D, 0xF5, 0x3F};
-// uint8_t node_apps_key[16] = {0x3F, 0x6A, 0x66, 0x45, 0x9D, 0x5E, 0xDC, 0xA6, 0x3C, 0xBC, 0x46, 0x19, 0xCD, 0x61, 0xA1, 0x1E};
 
 /** Application function definitions */
 void setup_app(void);
@@ -83,11 +87,13 @@ bool init_app(void);
 void app_event_handler(void);
 void ble_data_handler(void) __attribute__((weak));
 void lora_data_handler(void);
-bool handle_interrupt(void);
+void pin_change_triggered(void);
 bool send_periodic_lora_frame(void);
 
 /** Application Stuff */
-uint64_t total_counts = 0;
+time_t time_change_interrupt = millis();
+//uint64_t total_counts = 0;
+uint32_t total_counts = 0;
 uint32_t last_message_counts = 0;
 
 
@@ -195,8 +201,8 @@ bool init_app(void)
 	MYLOG("APP", "init_app");
 
 	// Setup the pin and interrupt for tipping spoon counter
-	pinMode(WB_IO3, INPUT);
-	attachInterrupt(WB_IO3, handle_interrupt, RISING);
+	pinMode(WB_IO1, INPUT_PULLUP);
+  attachInterrupt(WB_IO1, pin_change_triggered, FALLING);
 
 	return true;
 }
@@ -206,13 +212,22 @@ bool init_app(void)
    @brief Application specific event handler
           Handles the configured interrupt pin and awakens the unit to increment the rainfall count
 */
-void pir_triggered(void)
-{
-	// Define the event type
-	g_task_event_type |= PIR_TRIGGER;
-	// Wake up the handler, it will check g_task_event_type and know that he has to handle an PIR alarm.
-	xSemaphoreGiveFromISR(g_task_sem, pdFALSE);
-
+void pin_change_triggered(void){
+  noInterrupts();
+//  MYLOG("APP", "Falling Interrupt %u", millis());
+  // Only trigger if has been high for more than 250ms, and is now low
+  bool run_task = false;
+  if ((digitalRead(WB_IO1) == LOW) && (millis() - time_change_interrupt > 250)){
+    run_task=true;
+    time_change_interrupt = millis();
+  }
+  if ( run_task ){
+  	// Define the event type
+  	g_task_event_type |= PIR_TRIGGER;
+  	// Wake up the handler, it will check g_task_event_type and know that he has to handle an PIR alarm.
+  	xSemaphoreGiveFromISR(g_task_sem, pdFALSE);
+  }
+  interrupts();
 }
 
 /**
@@ -253,9 +268,12 @@ void app_event_handler(void)
 		/**************************************************************/
 		g_task_event_type &= N_PIR_TRIGGER;
 		MYLOG("APP", "PIR triggered");
-
-		total_counts += 1
+  		
+		total_counts += 1;
 		last_message_counts += 1;
+    MYLOG("APP", "Total Count = %u", total_counts);
+    MYLOG("APP", "Last Count = %u", last_message_counts);
+      
 	}
 }
 
@@ -440,7 +458,7 @@ bool send_periodic_lora_frame(void)
 	if (burst_mode_counter == 1){
 
 		sleep_time = default_sleep_time;
-		MYLOG("APP", "Switching to long sleep time %i", default_sleep_time);
+		MYLOG("APP", "Switching to long sleep time %u", default_sleep_time);
 		api_timer_restart(sleep_time);
 	}
 	if (burst_mode_counter > 0){
@@ -462,8 +480,8 @@ bool send_periodic_lora_frame(void)
 	uint8_t vbat_per = mvToPercent(vbat_mv);
 	
 
-	MYLOG("APP", "--------Total Counts------- =  %i", total_counts);
-	MYLOG("APP", "--Counts For This Message-- =  %i", last_message_counts);
+	MYLOG("APP", "--------Total Counts------- =  %u", total_counts);
+	MYLOG("APP", "--Counts For This Message-- =  %u", last_message_counts);
 	MYLOG("APP", "------Total Rainfall------ =  %f", (total_counts * 0.2));
 	MYLOG("APP", "------Batt Voltage (mv)------ =  %d", vbat_mv );
 	MYLOG("APP", "------Batt Level (Percent)------- =  %d", vbat_per);
@@ -473,10 +491,10 @@ bool send_periodic_lora_frame(void)
 	uint8_t m_lora_app_data_buffer[64]; // Max 64 bytes long
 
 	uint32_t buffSize = 0;
-	m_lora_app_data_buffer[buffSize++] = (total_counts >> 56) & 0xFF;
-	m_lora_app_data_buffer[buffSize++] = (total_counts >> 48) & 0xFF;
-	m_lora_app_data_buffer[buffSize++] = (total_counts >> 40) & 0xFF;
-	m_lora_app_data_buffer[buffSize++] = (total_counts >> 32) & 0xFF;
+//	m_lora_app_data_buffer[buffSize++] = (total_counts >> 56) & 0xFF;
+//	m_lora_app_data_buffer[buffSize++] = (total_counts >> 48) & 0xFF;
+//	m_lora_app_data_buffer[buffSize++] = (total_counts >> 40) & 0xFF;
+//	m_lora_app_data_buffer[buffSize++] = (total_counts >> 32) & 0xFF;
 	m_lora_app_data_buffer[buffSize++] = (total_counts >> 24) & 0xFF;
 	m_lora_app_data_buffer[buffSize++] = (total_counts >> 16) & 0xFF;
 	m_lora_app_data_buffer[buffSize++] = (total_counts >> 8) & 0xFF;

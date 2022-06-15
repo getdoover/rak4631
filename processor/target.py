@@ -410,12 +410,14 @@ class target:
         event_rainfall = (total_counts - new_event_zero_counts) * mm_per_count
 
         notification_msg = None
-        if ((new_event_zero_counts < total_counts) and 
+        if ((event_rainfall > 0) and 
             (current_time - new_last_non_zero_update > (reset_event_after * 60 * 60))):
             ## Reset the counter
             new_event_zero_counts = total_counts
 
-            notification_msg = "You've had " + str( round(event_rainfall, 1) ) + "mm"
+            if event_rainfall > 1:
+                ## Only send a rain text if more than 1mm
+                notification_msg = "You've had " + str( round(event_rainfall, 1) ) + "mm"
 
 
         ## Assess status icon
