@@ -8,7 +8,7 @@ function encodeDownlink(input) {
 
     if (('burst_mode' in input.data) && (input.data.burst_mode == true)){
         return {
-            bytes: [0, 20],
+            bytes: [0, 10],
             fPort: 2
         }
     }
