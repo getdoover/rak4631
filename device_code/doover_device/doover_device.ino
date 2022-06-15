@@ -201,8 +201,8 @@ bool init_app(void)
 	MYLOG("APP", "init_app");
 
 	// Setup the pin and interrupt for tipping spoon counter
-	pinMode(WB_IO1, INPUT_PULLUP);
-  attachInterrupt(WB_IO1, pin_change_triggered, FALLING);
+	pinMode(WB_IO1, INPUT_PULLDOWN);
+  	attachInterrupt(WB_IO1, pin_change_triggered, RISING);
 
 	return true;
 }
@@ -214,10 +214,10 @@ bool init_app(void)
 */
 void pin_change_triggered(void){
   noInterrupts();
-//  MYLOG("APP", "Falling Interrupt %u", millis());
+//  MYLOG("APP", "Rising Interrupt %u", millis());
   // Only trigger if has been high for more than 250ms, and is now low
   bool run_task = false;
-  if ((digitalRead(WB_IO1) == LOW) && (millis() - time_change_interrupt > 250)){
+  if ((digitalRead(WB_IO1) == HIGH) && (millis() - time_change_interrupt > 250)){
     run_task=true;
     time_change_interrupt = millis();
   }
