@@ -401,7 +401,7 @@ class target:
         new_event_zero_counts = event_zero_counts
         if event_zero_counts is None:
             new_event_zero_counts = total_counts
-        if event_zero_counts > total_counts: ## The device has restarted - reset the total
+        if new_event_zero_counts > total_counts: ## The device has restarted - reset the total
             new_event_zero_counts = 0
             if last_event_total is not None and last_event_total != 0:
                 last_event_counts = last_event_total / mm_per_count
