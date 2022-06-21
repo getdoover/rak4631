@@ -7,8 +7,8 @@
 Create, use and customise your own Doover powered nodes using RAK Wireless WisBlock hardware. In this case - The RAK4631 Lorawan module.
 
 Check the branches for individual applications including:
-- 4-20ma Level Sensor
-- Rain Gauge
+- [4-20ma Level Sensor](https://github.com/getdoover/rak4631/tree/4-20ma_level_sensor)
+- [Rain Gauge](https://github.com/getdoover/rak4631/tree/rain_gauge)
 
 
 For more information about Doover - go to Doover.com
