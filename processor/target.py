@@ -60,7 +60,7 @@ class target:
 
         except Exception as e:
             self.add_to_log("ERROR attempting to process message - " + str(e))
-            print(traceback.format_exc())
+            self.add_to_log(traceback.format_exc())
 
         self.complete_log()
 
