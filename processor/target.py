@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 from operator import truediv
-import os, sys, time, json, math
+import os, traceback, sys, time, json, math
 from signal import signal
 
 
@@ -60,6 +60,7 @@ class target:
 
         except Exception as e:
             self.add_to_log("ERROR attempting to process message - " + str(e))
+            print(traceback.format_exc())
 
         self.complete_log()
 
