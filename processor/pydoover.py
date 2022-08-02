@@ -118,7 +118,12 @@ class doover_api_iface:
         elif agent_id is not None and channel_name is not None:
             url = "/ch/v1/agent/" + str(agent_id) + "/" + str(channel_name) + "/"
         else:
-            raise Exception("Incorrect arguments supplied to publish_to_channel")
+            args = {
+                "channel_id" : channel_id,
+                "agent_id" : agent_id,
+                "channel_name" : channel_name,
+            }
+            raise Exception("Incorrect arguments supplied to publish_to_channel : " + str(args))
 
           
         res = self.make_post_request(
