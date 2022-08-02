@@ -74,7 +74,12 @@ class doover_api_iface:
             url = "/ch/v1/agent/" + str(agent_id) + "/" + str(channel_name) + "/"
             msgs_url = "/ch/v1/agent/" + str(agent_id) + "/" + str(channel_name) + "/messages/"
         else:
-            raise Exception("Incorrect arguments supplied to get_channel_details")
+            args = {
+                "channel_id" : channel_id,
+                "agent_id" : agent_id,
+                "channel_name" : channel_name,
+            }
+            raise Exception("Incorrect arguments supplied to get_channel_details : " + str(args))
 
         res = json.loads( 
             self.make_get_request(
