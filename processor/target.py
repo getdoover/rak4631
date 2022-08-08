@@ -14,6 +14,16 @@ from signal import signal
 ## You can import the pydoover module to interact with Doover based on decisions made in this function
 ## Just add the current directory to the path first
 # sys.path.append(os.path.dirname(__file__))
+import sys
+
+## attempt to delete any loaded pydoover modules that persist across lambdas
+if 'pydoover' in sys.modules:
+    del sys.modules['pydoover']
+try: del pydoover
+except: pass
+try: del pd
+except: pass
+
 import pydoover as pd
 
 
