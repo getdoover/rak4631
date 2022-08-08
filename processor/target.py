@@ -39,7 +39,7 @@ class target:
 
         self.create_doover_client()
 
-        self.add_to_log( "running : " + str(__file__) )
+        self.add_to_log( "running : " + str(os.getcwd()) + " " + str(__file__) )
 
         self.add_to_log( "kwargs = " + str(self.kwargs) )
         self.add_to_log( str( start_time ) )
