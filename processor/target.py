@@ -13,7 +13,7 @@ from signal import signal
 
 ## You can import the pydoover module to interact with Doover based on decisions made in this function
 ## Just add the current directory to the path first
-sys.path.append(os.path.dirname(__file__))
+# sys.path.append(os.path.dirname(__file__))
 import pydoover as pd
 
 
