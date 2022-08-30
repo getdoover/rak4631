@@ -193,23 +193,6 @@ class target:
                         "name": "details_submodule",
                         "displayString": "Details",
                         "children": {
-                            "tankType": {
-                                "type": "uiStateCommand",
-                                "name": "tankType",
-                                "displayString": "Tank Type",
-                                "userOptions": {
-                                    "flatBottom": {
-                                        "type": "uiElement",
-                                        "name": "flatBottom",
-                                        "displayString": "Flat Bottom"
-                                    },
-                                    "horizontalCylinder": {
-                                        "type": "uiElement",
-                                        "name": "horizontalCylinder",
-                                        "displayString": "Horizontal Cylinder"
-                                    }
-                                }
-                            },
                             "inputMax": {
                                 "type": "uiFloatParam",
                                 "name": "inputMax",
@@ -259,20 +242,6 @@ class target:
                                 "colour": "blue",
                                 "requiresConfirm": True
                             },
-                            "rawlevel": {
-                                "type": "uiVariable",
-                                "name": "rawlevel",
-                                "displayString": "Raw Reading (ma)",
-                                "varType": "float",
-                                "decPrecision": 2
-                            },
-                            "rawlevel_processed": {
-                                "type": "uiVariable",
-                                "name": "rawlevel_processed",
-                                "displayString": "Raw Reading (cm)",
-                                "varType": "float",
-                                "decPrecision": 1
-                            },
                             "rawBattery": {
                                 "type": "uiVariable",
                                 "name": "rawBattery",
@@ -286,18 +255,6 @@ class target:
                                 "displayString": "Last RSSI",
                                 "varType": "float"
                             },
-                            "lastSNR": {
-                                "type": "uiVariable",
-                                "name": "lastSNR",
-                                "displayString": "Last SNR",
-                                "varType": "float"
-                            },
-                            "lastUsedGateway": {
-                                "type": "uiVariable",
-                                "name": "lastUsedGateway",
-                                "displayString": "Lora Gateway",
-                                "varType": "text"
-                            }
                         }
                     },
                     "node_connection_info": {
@@ -383,13 +340,6 @@ class target:
         except Exception as e:
             self.add_to_log("Could not get current raw reading - " + str(e))
 
-        tank_type = "flatBottom"
-        try:
-            # sensor_1_type = state_obj['state']['children']['details_submodule']['children']['input1_setup_submodule']['children']['']
-            tank_type = cmds_obj['cmds']['tankType']
-        except Exception as e:
-            self.add_to_log("Could not get tank type - " + str(e))
-
         sensor_1_max = 250
         try:
             sensor_1_max = cmds_obj['cmds']['inputMax']
@@ -410,17 +360,14 @@ class target:
 
         input1_processed = None
         input1_percentage_level = None
-        if raw_reading_1 is not None and raw_reading_1 > 3.8:
-            # if sensor_1_type == "submersibleLevel":
-            input1_processed = int( (raw_reading_1 - 4) * 0.1875 * 1.6 * 100 )
-            input1_processed = (input1_processed + sensor_1_zero_cal) * sensor_1_scaling_cal
+        if raw_reading_1 is not None and raw_reading_1 > 0:
+            input1_processed = sensor_1_max - raw_reading_1
             input1_percentage_level = round((input1_processed / sensor_1_max) * 100, 1)
 
-        if tank_type == "horizontalCylinder":
-            # https://www.mathsisfun.com/geometry/cylinder-horizontal-volume.html
-            r = 50 ## 50 %
-            h = input1_percentage_level
-            input1_percentage_level = (math.acos((r-h)/r)*(r*r)) - ((r-h)*math.sqrt(2*r*h-(h*h)))
+        # https://www.mathsisfun.com/geometry/cylinder-horizontal-volume.html
+        r = 50 ## 50 %
+        h = input1_percentage_level
+        input1_percentage_level = (math.acos((r-h)/r)*(r*r)) - ((r-h)*math.sqrt(2*r*h-(h*h)))
 
         msg_obj = {
             "state" : {
@@ -436,9 +383,9 @@ class target:
                             "rawlevel" : {
                                 "currentValue" : raw_reading_1
                             },
-                            "rawlevel_processed" : {
-                                "currentValue" : input1_processed
-                            }
+                            # "rawlevel_processed" : {
+                            #     "currentValue" : input1_processed
+                            # }
                         }
                     }
                 }

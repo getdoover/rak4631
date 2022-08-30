@@ -18,18 +18,18 @@
 #ifdef NRF52_SERIES
 #if MY_DEBUG > 0
 #define MYLOG(tag, ...)                     \
-	do                                      \
-	{                                       \
-		if (tag)                            \
-			PRINTF("[%s] ", tag);           \
-		PRINTF(__VA_ARGS__);                \
-		PRINTF("\n");                       \
-		if (g_ble_uart_is_connected)        \
-		{                                   \
-			g_ble_uart.printf(__VA_ARGS__); \
-			g_ble_uart.printf("\n");        \
-		}                                   \
-	} while (0)
+  do                                      \
+  {                                       \
+    if (tag)                            \
+      PRINTF("[%s] ", tag);           \
+    PRINTF(__VA_ARGS__);                \
+    PRINTF("\n");                       \
+    if (g_ble_uart_is_connected)        \
+    {                                   \
+      g_ble_uart.printf(__VA_ARGS__); \
+      g_ble_uart.printf("\n");        \
+    }                                   \
+  } while (0)
 #else
 #define MYLOG(...)
 #endif
@@ -37,13 +37,13 @@
 #ifdef ARDUINO_ARCH_RP2040
 #if MY_DEBUG > 0
 #define MYLOG(tag, ...)                  \
-	do                                   \
-	{                                    \
-		if (tag)                         \
-			Serial.printf("[%s] ", tag); \
-		Serial.printf(__VA_ARGS__);      \
-		Serial.printf("\n");             \
-	} while (0)
+  do                                   \
+  {                                    \
+    if (tag)                         \
+      Serial.printf("[%s] ", tag); \
+    Serial.printf(__VA_ARGS__);      \
+    Serial.printf("\n");             \
+  } while (0)
 #else
 #define MYLOG(...)
 #endif
@@ -65,17 +65,33 @@
    - over BLE with My nRF52 Toolbox
 */
 
-uint8_t node_device_eui[8] = { {{ dev_eui_msb_array }} };
-// uint8_t node_device_eui[8] = { 0x70, 0xB3, 0xD5, 0x7E, 0xD0, 0x05, 0x1E, 0x75 };
+const char ENDPOINT[] = {{ endpoint }};
+// const char ENDPOINT[] = "a1zgnxur10j8ux.iot.us-east-1.amazonaws.com";
+const int ENDPOINT_PORT = {{ endpoint_port }};
+// const int ENDPOINT_PORT = 8883;
 
-uint8_t node_app_eui[8] = { {{ join_eui_msb_array }} };
-// uint8_t node_app_eui[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+const char DL_TOPIC[] = {{ downlink_topic }};
+// const char DL_TOPIC[] = "$aws/things/MQTT-1/shadow/update/accepted";
+const int UL_TOPIC[] = {{ uplink_topic }};
+// const char UL_TOPIC[] = "$aws/things/MQTT-1/shadow/update/accepted";
 
-uint8_t node_app_key[16] = { {{ app_key_msb_array }} };
-// uint8_t node_app_key[16] = { 0x83, 0xCB, 0xB1, 0x10, 0x45, 0x87, 0x70, 0x5C, 0xBD, 0x8C, 0x0B, 0xF8, 0x0F, 0xAB, 0x31, 0x04 };
+const char CA_CERT[] = R"EOF(
+{{ ca_cert }}
+)EOF";
 
-// uint8_t node_nws_key[16] = {0x32, 0x3D, 0x15, 0x5A, 0x00, 0x0D, 0xF3, 0x35, 0x30, 0x7A, 0x16, 0xDA, 0x0C, 0x9D, 0xF5, 0x3F};
-// uint8_t node_apps_key[16] = {0x3F, 0x6A, 0x66, 0x45, 0x9D, 0x5E, 0xDC, 0xA6, 0x3C, 0xBC, 0x46, 0x19, 0xCD, 0x61, 0xA1, 0x1E};
+const char DEVICE_CERT[] = R"EOF(
+{{ device_cert }}
+)EOF";
+
+const char PRIV_KEY[] = R"EOF(
+{{ priv_key }}
+)EOF";
+
+#define BG77_POWER_KEY WB_IO1
+#define BG77_GPS_ENABLE WB_IO2
+
+#define ULTRASONIC_PWR_ON WB_IO2
+
 
 /** Application function definitions */
 void setup_app(void);
@@ -83,14 +99,25 @@ bool init_app(void);
 void app_event_handler(void);
 void ble_data_handler(void) __attribute__((weak));
 void lora_data_handler(void);
-bool send_periodic_lora_frame(void);
+// bool send_periodic_lora_frame(void);
+
+float read_uart_sensor(void);
+
+void send_periodic_mqtt_message(void);
+void wake_modem(void);
+void configure_modem(void);
+void wait_for_modem_connect(void);
+String exchange_data(String message);
+void sleep_modem(void);
+
+String bg77_at(const char *at, uint16_t timeout);
 
 
 /** Application stuff */
-uint32_t burst_mode_sleep_time = 30 * 1000; // 30 seconds
-uint32_t burst_mode_counter = 20;
+uint32_t burst_mode_sleep_time = 60 * 1000; // 60 seconds
+uint32_t burst_mode_counter = 7;
 
-uint32_t default_sleep_time = 10 * 60 * 1000; // 10 minutes
+uint32_t default_sleep_time = 30 * 60 * 1000; // 30 minutes
 uint32_t sleep_time = burst_mode_sleep_time;
 
 
@@ -118,66 +145,73 @@ uint8_t send_fail = 0;
 */
 void setup_app(void)
 {
-	Serial.begin(115200);
-	time_t serial_timeout = millis();
-	// On nRF52840 the USB serial is not available immediately
-	while (!Serial)
-	{
-		if ((millis() - serial_timeout) < 5000)
-		{
-			delay(100);
-			digitalWrite(LED_GREEN, !digitalRead(LED_GREEN));
-		}
-		else
-		{
-			break;
-		}
-	}
-	digitalWrite(LED_GREEN, LOW);
+  Serial.begin(115200);
+  time_t serial_timeout = millis();
+  // On nRF52840 the USB serial is not available immediately
+  while (!Serial)
+  {
+    if ((millis() - serial_timeout) < 5000)
+    {
+      delay(100);
+      digitalWrite(LED_GREEN, !digitalRead(LED_GREEN));
+    }
+    else
+    {
+      break;
+    }
+  }
+  digitalWrite(LED_GREEN, LOW);
 
-	MYLOG("APP", "Setup Doover RAK4631 Node");
+  MYLOG("APP", "Setup Doover RAK4631 Node");
 
 #ifdef NRF52_SERIES
-	// Enable BLE
-  	g_enable_ble = false;
+  // Enable BLE
+    g_enable_ble = false;
 #endif
 
-	// Set firmware version
-	api_set_version(SW_VERSION_1, SW_VERSION_2, SW_VERSION_3);
+  // Set firmware version
+  api_set_version(SW_VERSION_1, SW_VERSION_2, SW_VERSION_3);
 
-	// Optional
-	// Setup LoRaWAN credentials hard coded
-	// It is strongly recommended to avoid duplicated node credentials
-	// Options to setup credentials are
-	// -over USB with AT commands
-	// -over BLE with My nRF52 Toolbox
+  // Optional
+  // Setup LoRaWAN credentials hard coded
+  // It is strongly recommended to avoid duplicated node credentials
+  // Options to setup credentials are
+  // -over USB with AT commands
+  // -over BLE with My nRF52 Toolbox
 
-	// Read LoRaWAN settings from flash
-	api_read_credentials();
-	// Change LoRaWAN settings
-	g_lorawan_settings.auto_join = true;							// Flag if node joins automatically after reboot
-	g_lorawan_settings.otaa_enabled = true;							// Flag for OTAA or ABP
-	memcpy(g_lorawan_settings.node_device_eui, node_device_eui, 8); // OTAA Device EUI MSB
-	memcpy(g_lorawan_settings.node_app_eui, node_app_eui, 8);		// OTAA Application EUI MSB
-	memcpy(g_lorawan_settings.node_app_key, node_app_key, 16);		// OTAA Application Key MSB
-	// memcpy(g_lorawan_settings.node_nws_key, node_nws_key, 16);		// ABP Network Session Key MSB
-	// memcpy(g_lorawan_settings.node_apps_key, node_apps_key, 16);	// ABP Application Session key MSB
-	// g_lorawan_settings.node_dev_addr = 0x26021FB4;					// ABP Device Address MSB
-	g_lorawan_settings.send_repeat_time = 120000;					// Send repeat time in milliseconds: 2 * 60 * 1000 => 2 minutes
-	g_lorawan_settings.adr_enabled = true;							// Flag for ADR on or off
-	g_lorawan_settings.public_network = true;						// Flag for public or private network
-	g_lorawan_settings.duty_cycle_enabled = false;					// Flag to enable duty cycle (validity depends on Region)
-	g_lorawan_settings.join_trials = 5;								// Number of join retries
-	g_lorawan_settings.tx_power = 22;								// TX power 0 .. 15 (validity depends on Region)
-	g_lorawan_settings.data_rate = 3;								// Data rate 0 .. 15 (validity depends on Region)
-	g_lorawan_settings.lora_class = 0;								// LoRaWAN class 0: A, 2: C, 1: B is not supported
-	g_lorawan_settings.subband_channels = 2;						// Subband channel selection 1 .. 9
-	// g_lorawan_settings.app_port = 2;								// Data port to send data
-	g_lorawan_settings.confirmed_msg_enabled = LMH_UNCONFIRMED_MSG; // Flag to enable confirmed messages
-	g_lorawan_settings.resetRequest = true;							// Command from BLE to reset device
-	g_lorawan_settings.lora_region = LORAMAC_REGION_AU915;		// LoRa region
-	// Save LoRaWAN settings
-	api_set_credentials();
+  // Read LoRaWAN settings from flash
+  api_read_credentials();
+  // Change LoRaWAN settings
+  g_lorawan_settings.auto_join = true;             // Flag if node joins automatically after reboot
+   g_lorawan_settings.otaa_enabled = true;              // Flag for OTAA or ABP
+//   memcpy(g_lorawan_settings.node_device_eui, node_device_eui, 8); // OTAA Device EUI MSB
+//   memcpy(g_lorawan_settings.node_app_eui, node_app_eui, 8);    // OTAA Application EUI MSB
+//   memcpy(g_lorawan_settings.node_app_key, node_app_key, 16);   // OTAA Application Key MSB
+   // memcpy(g_lorawan_settings.node_nws_key, node_nws_key, 16);    // ABP Network Session Key MSB
+   // memcpy(g_lorawan_settings.node_apps_key, node_apps_key, 16);  // ABP Application Session key MSB
+   // g_lorawan_settings.node_dev_addr = 0x26021FB4;          // ABP Device Address MSB
+   g_lorawan_settings.send_repeat_time = 120000;          // Send repeat time in milliseconds: 2 * 60 * 1000 => 2 minutes
+   g_lorawan_settings.adr_enabled = true;             // Flag for ADR on or off
+   g_lorawan_settings.public_network = true;            // Flag for public or private network
+   g_lorawan_settings.duty_cycle_enabled = false;         // Flag to enable duty cycle (validity depends on Region)
+//   g_lorawan_settings.join_trials = 5;                // Number of join retries
+   g_lorawan_settings.join_trials = 0;                // Number of join retries
+   g_lorawan_settings.tx_power = 22;                // TX power 0 .. 15 (validity depends on Region)
+   g_lorawan_settings.data_rate = 3;                // Data rate 0 .. 15 (validity depends on Region)
+   g_lorawan_settings.lora_class = 0;               // LoRaWAN class 0: A, 2: C, 1: B is not supported
+   g_lorawan_settings.subband_channels = 2;           // Subband channel selection 1 .. 9
+   // g_lorawan_settings.app_port = 2;                // Data port to send data
+   g_lorawan_settings.confirmed_msg_enabled = LMH_UNCONFIRMED_MSG; // Flag to enable confirmed messages
+   g_lorawan_settings.resetRequest = true;              // Command from BLE to reset device
+   g_lorawan_settings.lora_region = LORAMAC_REGION_AU915;   // LoRa region
+   // Save LoRaWAN settings
+  api_set_credentials();
+
+
+  pinMode(BG77_POWER_KEY, OUTPUT);
+  pinMode(ULTRASONIC_PWR_ON, OUTPUT);
+  digitalWrite(ULTRASONIC_PWR_ON, LOW); // Turn Power to sensor off
+
 }
 
 /**
@@ -187,8 +221,14 @@ void setup_app(void)
 */
 bool init_app(void)
 {
-	MYLOG("APP", "init_app");
-	return true;
+  MYLOG("APP", "init_app");
+  send_periodic_mqtt_message();
+  api_timer_init();
+//  g_lorawan_initialized = true;
+//  api_timer_start();
+  api_timer_restart(sleep_time);
+  MYLOG("APP", "init_app complete");
+  return true;
 }
 
 /**
@@ -198,48 +238,31 @@ bool init_app(void)
 */
 void app_event_handler(void)
 {
-	// Timer triggered event
-	if ((g_task_event_type & STATUS) == STATUS)
-	{
-		g_task_event_type &= N_STATUS;
-		MYLOG("APP", "Timer wakeup");
+  MYLOG("APP", "app_event_handler called");
+  
+  // Timer triggered event
+  if ((g_task_event_type & STATUS) == STATUS)
+  {
+    g_task_event_type &= N_STATUS;
+    MYLOG("APP", "Timer wakeup");
 
 #ifdef NRF52_SERIES
-		// If BLE is enabled, restart Advertising
-		if (g_enable_ble)
-		{
-			restart_advertising(15);
-		}
+    // If BLE is enabled, restart Advertising
+    if (g_enable_ble)
+    {
+      restart_advertising(15);
+    }
 #endif
-		if (lora_busy)
-		{
-			MYLOG("APP", "LoRaWAN TX cycle not finished, skip this event");
-		}
-		else
-		{
-
-			send_periodic_lora_frame();
-
-			// // Dummy packet
-			// uint8_t dummy_packet[] = {0x10, 0x00, 0x00};
-			// lmh_error_status result = send_lora_packet(dummy_packet, 3);
-
-			// switch (result)
-			// {
-			// case LMH_SUCCESS:
-			// 	MYLOG("APP", "Packet enqueued");
-			// 	// Set a flag that TX cycle is running
-			// 	lora_busy = true;
-			// 	break;
-			// case LMH_BUSY:
-			// 	MYLOG("APP", "LoRa transceiver is busy");
-			// 	break;
-			// case LMH_ERROR:
-			// 	MYLOG("APP", "Packet error, too big to send with current DR");
-			// 	break;
-			// }
-		}
-	}
+    // if (lora_busy)
+    // {
+    //  MYLOG("APP", "LoRaWAN TX cycle not finished, skip this event");
+    // }
+    // else
+    // {
+    //  send_periodic_lora_frame();
+    // }
+    send_periodic_mqtt_message();
+  }
 }
 
 #ifdef NRF52_SERIES
@@ -248,30 +271,30 @@ void app_event_handler(void)
 */
 void ble_data_handler(void)
 {
-	if (g_enable_ble)
-	{
-		/**************************************************************/
-		/**************************************************************/
-		/// \todo BLE UART data arrived
-		/// \todo or forward them to the AT command interpreter
-		/// \todo parse them here
-		/**************************************************************/
-		/**************************************************************/
-		if ((g_task_event_type & BLE_DATA) == BLE_DATA)
-		{
-			MYLOG("AT", "RECEIVED BLE");
-			// BLE UART data arrived
-			// in this example we forward it to the AT command interpreter
-			g_task_event_type &= N_BLE_DATA;
+  if (g_enable_ble)
+  {
+    /**************************************************************/
+    /**************************************************************/
+    /// \todo BLE UART data arrived
+    /// \todo or forward them to the AT command interpreter
+    /// \todo parse them here
+    /**************************************************************/
+    /**************************************************************/
+    if ((g_task_event_type & BLE_DATA) == BLE_DATA)
+    {
+      MYLOG("AT", "RECEIVED BLE");
+      // BLE UART data arrived
+      // in this example we forward it to the AT command interpreter
+      g_task_event_type &= N_BLE_DATA;
 
-			while (g_ble_uart.available() > 0)
-			{
-				at_serial_input(uint8_t(g_ble_uart.read()));
-				delay(5);
-			}
-			at_serial_input(uint8_t('\n'));
-		}
-	}
+      while (g_ble_uart.available() > 0)
+      {
+        at_serial_input(uint8_t(g_ble_uart.read()));
+        delay(5);
+      }
+      at_serial_input(uint8_t('\n'));
+    }
+  }
 }
 #endif
 
@@ -280,226 +303,528 @@ void ble_data_handler(void)
 */
 void lora_data_handler(void)
 {
-	// LoRa Join finished handling
-	if ((g_task_event_type & LORA_JOIN_FIN) == LORA_JOIN_FIN)
-	{
-		g_task_event_type &= N_LORA_JOIN_FIN;
-		if (g_join_result)
-		{
-			MYLOG("APP", "Successfully joined network");
-			send_periodic_lora_frame();
-			api_timer_restart(sleep_time);
-		}
-		else
-		{
-			MYLOG("APP", "Join network failed");
-			/// \todo here join could be restarted.
-			lmh_join();
-		}
-	}
-
-	// LoRa data handling
-	if ((g_task_event_type & LORA_DATA) == LORA_DATA)
-	{
-		/**************************************************************/
-		/**************************************************************/
-		/// \todo LoRa data arrived
-		/// \todo parse them here
-		/**************************************************************/
-		/**************************************************************/
-		g_task_event_type &= N_LORA_DATA;
-		MYLOG("APP", "Received package over LoRa");
-		
-		char log_buff[g_rx_data_len * 3] = {0};
-		uint8_t log_idx = 0;
-		for (int idx = 0; idx < g_rx_data_len; idx++)
-		{
-			sprintf(&log_buff[log_idx], "%02X ", g_rx_lora_data[idx]);
-			log_idx += 3;
-		}
-		MYLOG("APP", "Message : %s", log_buff);
-		lora_busy = false;
-		
-		if (g_rx_data_len == 2){
-			// This is a burst mode message
-			MYLOG("APP", "Recieved a new burst mode message");
-
-			uint32_t new_counter = g_rx_lora_data[0] << 8;
-			new_counter |= g_rx_lora_data[1];
-
-			burst_mode_counter = new_counter;
-			sleep_time = burst_mode_sleep_time;
-
-			// After setting a new burst mode counter time, send a new packet to update the reported sleep interval  
-			send_periodic_lora_frame();
-			api_timer_restart(sleep_time);
-		}
-		else {
-
-			// Assuming the new time is encoded as 3 bytes. e.g. 30=> 0x00, 0x00, 0x1F
-			// Downlink must be sent on Port2
-			// Downlink is in seconds
-			uint32_t new_time = g_rx_lora_data[0] << 16;
-			new_time |= g_rx_lora_data[1] << 8;
-			new_time |= g_rx_lora_data[2];
-			
-			sleep_time = new_time * 1000;
-			default_sleep_time = sleep_time; // Set the default long sleep time to this as well, so it will revert to this again after burst mode
-			
-			MYLOG("APP", "New uplink time set %i", new_time);
-	
-			// If a new sleep time is set manually, then forget about the init fast counter
-			burst_mode_counter = 0;
-	
-			// After setting a new sleep time, send a new packet to update the reported sleep interval
-			send_periodic_lora_frame();
-			api_timer_restart(sleep_time);
-		}
-
-	}
-
-	// LoRa TX finished handling
-	if ((g_task_event_type & LORA_TX_FIN) == LORA_TX_FIN)
-	{
-		g_task_event_type &= N_LORA_TX_FIN;
-
-		MYLOG("APP", "LPWAN TX cycle %s", g_rx_fin_result ? "finished ACK" : "failed NAK");
-
-		if (!g_rx_fin_result)
-		{
-			// Increase fail send counter
-			send_fail++;
-
-			if (send_fail == 10)
-			{
-				// Too many failed sendings, reset node and try to rejoin
-				delay(100);
-				api_reset();
-			}
-		}
-
-		// Clear the LoRa TX flag
-		lora_busy = false;
-	}
+  MYLOG("APP", "lora_data_handler called");
 }
+// void lora_data_handler(void)
+// {
+//  // LoRa Join finished handling
+//  if ((g_task_event_type & LORA_JOIN_FIN) == LORA_JOIN_FIN)
+//  {
+//    g_task_event_type &= N_LORA_JOIN_FIN;
+//    if (g_join_result)
+//    {
+//      MYLOG("APP", "Successfully joined network");
+//      send_periodic_lora_frame();
+//      api_timer_restart(sleep_time);
+//    }
+//    else
+//    {
+//      MYLOG("APP", "Join network failed");
+//      /// \todo here join could be restarted.
+//      lmh_join();
+//    }
+//  }
+
+//  // LoRa data handling
+//  if ((g_task_event_type & LORA_DATA) == LORA_DATA)
+//  {
+//    /**************************************************************/
+//    /**************************************************************/
+//    /// \todo LoRa data arrived
+//    /// \todo parse them here
+//    /**************************************************************/
+//    /**************************************************************/
+//    g_task_event_type &= N_LORA_DATA;
+//    MYLOG("APP", "Received package over LoRa");
+    
+//    char log_buff[g_rx_data_len * 3] = {0};
+//    uint8_t log_idx = 0;
+//    for (int idx = 0; idx < g_rx_data_len; idx++)
+//    {
+//      sprintf(&log_buff[log_idx], "%02X ", g_rx_lora_data[idx]);
+//      log_idx += 3;
+//    }
+//    MYLOG("APP", "Message : %s", log_buff);
+//    lora_busy = false;
+    
+//    if (g_rx_data_len == 2){
+//      // This is a burst mode message
+//      MYLOG("APP", "Recieved a new burst mode message");
+
+//      uint32_t new_counter = g_rx_lora_data[0] << 8;
+//      new_counter |= g_rx_lora_data[1];
+
+//      burst_mode_counter = new_counter;
+//      sleep_time = burst_mode_sleep_time;
+
+//      // After setting a new burst mode counter time, send a new packet to update the reported sleep interval  
+//      send_periodic_lora_frame();
+//      api_timer_restart(sleep_time);
+//    }
+//    else {
+
+//      // Assuming the new time is encoded as 3 bytes. e.g. 30=> 0x00, 0x00, 0x1F
+//      // Downlink must be sent on Port2
+//      // Downlink is in seconds
+//      uint32_t new_time = g_rx_lora_data[0] << 16;
+//      new_time |= g_rx_lora_data[1] << 8;
+//      new_time |= g_rx_lora_data[2];
+      
+//      sleep_time = new_time * 1000;
+//      default_sleep_time = sleep_time; // Set the default long sleep time to this as well, so it will revert to this again after burst mode
+      
+//      MYLOG("APP", "New uplink time set %i", new_time);
+  
+//      // If a new sleep time is set manually, then forget about the init fast counter
+//      burst_mode_counter = 0;
+  
+//      // After setting a new sleep time, send a new packet to update the reported sleep interval
+//      send_periodic_lora_frame();
+//      api_timer_restart(sleep_time);
+//    }
+
+//  }
+
+//  // LoRa TX finished handling
+//  if ((g_task_event_type & LORA_TX_FIN) == LORA_TX_FIN)
+//  {
+//    g_task_event_type &= N_LORA_TX_FIN;
+
+//    MYLOG("APP", "LPWAN TX cycle %s", g_rx_fin_result ? "finished ACK" : "failed NAK");
+
+//    if (!g_rx_fin_result)
+//    {
+//      // Increase fail send counter
+//      send_fail++;
+
+//      if (send_fail == 10)
+//      {
+//        // Too many failed sendings, reset node and try to rejoin
+//        delay(100);
+//        api_reset();
+//      }
+//    }
+
+//    // Clear the LoRa TX flag
+//    lora_busy = false;
+//  }
+// }
 
 
 float readVBAT(void)
 {
-	float raw;
+  float raw;
 
-	// Get the raw 12-bit, 0..3000mV ADC value
-	analogReadResolution(12);
-	raw = analogRead(batt_volts_pin);
-	delay(50);
-	analogReadResolution(10);
+  // Get the raw 12-bit, 0..3000mV ADC value
+  analogReadResolution(12);
+  raw = analogRead(batt_volts_pin);
+  delay(50);
+  analogReadResolution(10);
 
-	return raw * REAL_VBAT_MV_PER_LSB;
+  return raw * REAL_VBAT_MV_PER_LSB;
 }
 uint8_t mvToPercent(float mvolts)
 {
-	if (mvolts < 3300)
-		return 0;
-	if (mvolts < 3600)
-	{
-		mvolts -= 3300;
-		return mvolts / 30;
-	}
-	mvolts -= 3600;
-	return 10 + (mvolts * 0.15F); // thats mvolts /6.66666666
+  if (mvolts < 3300)
+    return 0;
+  if (mvolts < 3600)
+  {
+    mvolts -= 3300;
+    return mvolts / 30;
+  }
+  mvolts -= 3600;
+  return 10 + (mvolts * 0.15F); // thats mvolts /6.66666666
 }
 
 
-bool send_periodic_lora_frame(void)
+void send_periodic_mqtt_message(void)
 {
-	if (lmh_join_status_get() != LMH_SET)
-	{
-		//Not joined, try again later
-		MYLOG("APP", "Trying to send lora frame without being joined - try later");
-		return false;
-	}
+    // Assess the sleep time situation; If the initial startup time has elapsed, then change to long term sleep time
+  if (burst_mode_counter == 1){
 
-  	// Assess the sleep time situation; If the initial startup time has elapsed, then change to long term sleep time
-	if (burst_mode_counter == 1){
-
-		sleep_time = default_sleep_time;
-		MYLOG("APP", "Switching to long sleep time %i", default_sleep_time);
-		api_timer_restart(sleep_time);
-	}
-	if (burst_mode_counter > 0){
-		burst_mode_counter = burst_mode_counter - 1;
-		MYLOG("APP", "%i more messages in burst mode", burst_mode_counter);
-	}
+    sleep_time = default_sleep_time;
+    MYLOG("APP", "Switching to long sleep time %i", default_sleep_time);
+    api_timer_restart(sleep_time);
+  }
+  if (burst_mode_counter > 0){
+    burst_mode_counter = burst_mode_counter - 1;
+    MYLOG("APP", "%i more messages in burst mode", burst_mode_counter);
+  }
   
 
-	// Battery Voltage
-	// Get a raw ADC reading
-	analogReference(AR_INTERNAL_3_0);
-	delay(50);
-	int vbat_mv = readVBAT();
-	int vbat_VOLT = (vbat_mv / 10) - 300;
+  // Battery Voltage
+  // Get a raw ADC reading
+  analogReference(AR_INTERNAL_3_0);
+  delay(50);
+  int vbat_mv = readVBAT();
+  int vbat_VOLT = (vbat_mv / 10) - 300;
 
-	analogReference(AR_INTERNAL);   //This takes it back to default (3.6V)
+  analogReference(AR_INTERNAL);   //This takes it back to default (3.6V)
 
-	// Convert from raw mv to percentage (based on LIPO chemistry)
-	uint8_t vbat_per = mvToPercent(vbat_mv);
-	
+  // Convert from raw mv to percentage (based on LIPO chemistry)
+  uint8_t vbat_per = mvToPercent(vbat_mv);
+  
+  // Make a sensor reading
+    float sensor_reading = read_uart_sensor();
 
-	// Make a sensor reading
-    int sensor_pin = A1;   // select the input pin for the potentiometer
-    int mcu_ain_value = 0;  
-    int average_value;  
-    float voltage_ain;
-    float current_sensor; // variable to store the value coming from the sensor
+  // Report data to serial
+  MYLOG("APP", "-------Level Sensor (cm)------ =  %f", sensor_reading);
+  MYLOG("APP", "-----Batt Voltage (mV)----- =  %d", vbat_mv);
+  MYLOG("APP", "------Batt Level (Percent)------- =  %d", vbat_per);
+  
+  // Compile the mqtt packet
+  String test_message = "{\"is_working\": true}";
 
-	/* WisBLOCK 5801 Power On*/
-	pinMode(WB_IO1, OUTPUT);
-	digitalWrite(WB_IO1, HIGH);
-	delay(500);
-	/* WisBLOCK 5801 Power On*/
+  // Send data
+  wake_modem();
+  configure_modem();
+  wait_for_modem_connect();
+  String recv_data = exchange_data(test_message);
+  sleep_modem();
 
-	// Take 10 readings, then get the average
-    int i;
-	for (i = 0; i < 10; i++){ mcu_ain_value += analogRead(sensor_pin); }
+  MYLOG("APP", "Packet Sent");
+}
 
-    /* WisBLOCK 5801 Power Off*/
-  	digitalWrite(WB_IO1, LOW);
-    /* WisBLOCK 5801 Power Off*/
 
-    average_value = mcu_ain_value / i;
-    voltage_ain = average_value * 3.6 /1024;      //raef 3.6v / 10bit ADC
-    current_sensor = voltage_ain / 149.9 * 1000;    //WisBlock RAK5801 I=U/149.9\*1000 (mA)
-    int current_sensor_payload = current_sensor * 1000;
-    
-	MYLOG("APP", "-------Current Sensor------ =  %f", current_sensor);
-	MYLOG("APP", "--Current Sensor Payload--- =  %d", current_sensor_payload);
-	MYLOG("APP", "-----Batt Voltage (mV)----- =  %d", vbat_mv);
-	MYLOG("APP", "------Batt Level (Percent)------- =  %d", vbat_per);
-	
 
-	// Compile the lora packet
-	uint8_t m_lora_app_data_buffer[64]; // Max 64 bytes long
+void wake_modem()
+{
 
-	uint32_t buffSize = 0;
-	m_lora_app_data_buffer[buffSize++] = highByte(current_sensor_payload);
-	m_lora_app_data_buffer[buffSize++] = lowByte(current_sensor_payload);
-	m_lora_app_data_buffer[buffSize++] = 0; // Reserved for second sensor
-	m_lora_app_data_buffer[buffSize++] = 0; // Reserved for second sensor
-	m_lora_app_data_buffer[buffSize++] = vbat_mv / 20;
-	m_lora_app_data_buffer[buffSize++] = highByte(sleep_time / 1000);
-	m_lora_app_data_buffer[buffSize++] = lowByte(sleep_time / 1000);
-	m_lora_app_data_buffer[buffSize++] = burst_mode_counter;
-	// m_lora_app_data_buffer[buffSize++] = vbat_per;
-	
-	//  m_lora_app_data_buffer[buffSize++] = 'l';
-	//  m_lora_app_data_buffer[buffSize++] = 'o';
+  //BG77 init , Check if the modem is already awake
+  time_t timeout = millis();
+  bool moduleSleeps = true;
+  
+  Serial1.flush();
+  // Serial Used for NBIoT Comms
+  Serial1.begin(115200);
+  delay(100);
+  while (Serial1.available()) Serial1.read();
+  
+  Serial1.println("ATI");
+  //BG77 init
+  while ((millis() - timeout) < 1000)
+  {
+    if (Serial1.available())
+    {
+    String result = Serial1.readString();
+//    Serial.println();
+    MYLOG("APP", "Modem already awake");
+//    Serial.println(result);
+    moduleSleeps = false;
+    }
+  }
+  if (moduleSleeps)
+  {
+    // Module slept, wake it up
+    MYLOG("APP", "Waking Modem Up");
+//    pinMode(BG77_POWER_KEY, OUTPUT);
+    digitalWrite(BG77_POWER_KEY, 0);
+    delay(100);
+    digitalWrite(BG77_POWER_KEY, 1);
+    delay(1000);
+    digitalWrite(BG77_POWER_KEY, 0);
+    delay(100);
+  }
+  MYLOG("APP", "BG77 power up");
 
-	lmh_app_data_t m_lora_app_data = {m_lora_app_data_buffer, 0, 0, 0, 0};
-	m_lora_app_data.buffsize = buffSize;
-	m_lora_app_data.port = 2;
+  // Wait for modem 'RDY'
+  delay(1000);
 
-	lmh_error_status error = lmh_send(&m_lora_app_data, LMH_UNCONFIRMED_MSG);
+  //active and join to the net, this part may depend on some information of your operator.
+  bg77_at("AT+CFUN=1,0", 100);
+  //  delay(300);
+  //  bg77_at("AT+CPIN?", 500);
+  //  delay(300);
+  //  bg77_at("AT+QNWINFO", 500);
+  //  delay(300);
+  //  bg77_at("AT+QCSQ", 500);
+  //  delay(300);
 
-	MYLOG("APP", "Packet Sent");
-	return (error == 0);
+}
+
+void wait_for_modem_connect(){
+  
+  // Wait for modem to connect, or maximum of 15 seconds
+  String resp = "";
+  bool is_connected = false;
+  
+  time_t lte_connect_timeout = millis();
+  while ((!is_connected) && ((millis() - lte_connect_timeout) < 15000))
+  {
+    resp = bg77_at("AT+CSQ", 100);
+    // If resp contains Ok, but does not contain 99,99, then connected
+    // if ((resp.indexOf("99,99") == -1) && (resp.indexOf("OK") != -1)){
+    if ((resp.length() > 5) && (resp.indexOf("99,99") == -1)){
+    is_connected = true;
+//    Serial.println("Connected");
+    MYLOG("APP", "Modem connected to internet");
+    }
+    delay(250);
+  }
+  
+  bg77_at("AT+CGDCONT=1,\"IP\",\"telstra.iph\",\"0.0.0.0\",0,0", 100);
+  bg77_at("AT+QIACT=1", 250);
+
+}
+
+void sleep_modem()
+{
+  bool moduleSleeps = true;
+
+  //  Serial1.flush();
+  while (Serial1.available()) Serial1.read();
+  
+  Serial1.println("ATI");
+  //BG77 init
+  time_t timeout = millis();
+  while ((millis() - timeout) < 1000)
+  {
+    if (Serial1.available())
+    {
+    String result = Serial1.readString();
+    MYLOG("APP", "Modem awake");
+    moduleSleeps = false;
+    }
+  }
+
+  Serial1.end();
+  if (!moduleSleeps)
+  {
+    MYLOG("APP", "Putting modem to sleep");
+    // Module slept, wake it up
+//    pinMode(BG77_POWER_KEY, OUTPUT);
+    digitalWrite(BG77_POWER_KEY, 0);
+    delay(100);
+    digitalWrite(BG77_POWER_KEY, 1);
+    delay(1000);
+    digitalWrite(BG77_POWER_KEY, 0);
+    delay(100);
+  }
+  MYLOG("APP", "BG77 powered down");
+}
+
+
+//void parse_gps()
+//{
+//  int index1 = gps_data.indexOf(',');
+//
+//  if (strstr(gps_data.c_str(), "E") != NULL)
+//  {
+//    int index2 = gps_data.indexOf('E');
+//    gps_data = gps_data.substring(index1 + 1, index2 + 1);
+//  }
+//  if (strstr(gps_data.c_str(), "W") != NULL)
+//  {
+//    int index3 = gps_data.indexOf('W');
+//    gps_data = gps_data.substring(index1 + 1, index3 + 1);
+//  }
+//
+//}
+//
+//
+//void get_gps()
+//{
+//  int gps_count = 300;
+//  int timeout = 1000;
+//  while (gps_count--)
+//  {
+//    Serial1.write("AT+QGPSLOC?\r");
+//    timeout = 1000;
+//    while (timeout--)
+//    {
+//      if (Serial1.available())
+//      {
+//        gps_data += char(Serial1.read());
+//      }
+//      delay(1);
+//    }
+//    if (strstr(gps_data.c_str(), "CME ERROR") != NULL)
+//    {
+//      gps_data = "";
+//      continue;
+//    }
+//    if (strstr(gps_data.c_str(), "E") != NULL || strstr(gps_data.c_str(), "W") != NULL)
+//    {
+//      Serial.println(gps_data);
+//      parse_gps();
+//      break;
+//    }
+//  }
+//}
+
+
+//this function is suitable for most AT commands of bg96. e.g. bg96_at("ATI")
+String bg77_at(const char *at, uint16_t timeout)
+{
+  String bg77_rsp = "";
+  char tmp[256] = {0};
+  int len = strlen(at);
+  strncpy(tmp, at, len);
+  uint16_t t = timeout;
+  tmp[len] = '\r';
+
+  //  Serial.write(tmp);
+  //  Serial.write("\n");
+
+  Serial1.write(tmp);
+  delay(10);
+  while (t--)
+  {
+    if (Serial1.available())
+    {
+    bg77_rsp += char(Serial1.read());
+    }
+    delay(1);
+  }
+  bg77_rsp.trim(); // Remove unnecessary whitespace
+//  Serial.println(bg77_rsp);
+  char buf[100];
+  bg77_rsp.toCharArray(buf, 100);
+  MYLOG("APP", buf);
+
+  return bg77_rsp;
+}
+
+
+void configure_modem(){
+
+  //https://www.quectel.com/wp-content/uploads/2021/03/Quectel_BG95BG77BG600L_Series_MQTT_Application_Note_V1.1-1.pdf
+
+  // MQTT Config
+  bg77_at("AT+QMTCFG=\"ssl\",0,1,2", 100); //Set SSL context ID as 1.
+  bg77_at("AT+QSSLCFG=\"seclevel\",2,2", 100); //SSL authentication mode: server and client authentication
+  bg77_at("AT+QSSLCFG=\"sslversion\",2,4", 100); //Set SSL version
+  //  bg77_at("AT+QSSLCFG=\"ciphersuite\",2,0XFFFF", 100); //Set SSL cipher suite
+  bg77_at("AT+QSSLCFG=\"ignorelocaltime\",2,1", 100); //Ignore the time of authentication
+
+  char buf[50];
+  sprintf(buf, "AT+QFUPL=\"cacert.pem\",%d,100", sizeof(CA_CERT));
+  bg77_at(buf, 100);
+  // "CONNECT"
+  bg77_at(CA_CERT, 500);
+  bg77_at("AT+QSSLCFG=\"cacert\",2,\"cacert.pem\"", 100);
+
+  // Upload Client Cert File ".pem"
+  sprintf(buf, "AT+QFUPL=\"client.pem\",%d,100", sizeof(DEVICE_CERT));
+  bg77_at(buf, 100);
+  // "CONNECT"
+  bg77_at(DEVICE_CERT, 500);
+  bg77_at("AT+QSSLCFG=\"clientcert\",2,\"client.pem\"", 100);
+
+  // Upload Client Private Key ".pem"
+  sprintf(buf, "AT+QFUPL=\"user_key.pem\",%d,100", sizeof(PRIV_KEY));
+  bg77_at(buf, 100);
+  // "CONNECT"
+  bg77_at(PRIV_KEY, 500);
+  bg77_at("AT+QSSLCFG=\"clientkey\",2,\"user_key.pem\"", 100);
+}
+
+String exchange_data(String message)
+{
+  // https://www.quectel.com/wp-content/uploads/2021/03/Quectel_BG95BG77BG600L_Series_MQTT_Application_Note_V1.1-1.pdf
+
+  char buf[100];
+  sprintf(buf, "AT+QMTOPEN=0,\"%s\",%d", ENDPOINT, ENDPOINT_PORT);
+  bg77_at(buf, 1000);
+  bg77_at("AT+QMTCONN=0,\"MQTT-1\"", 1000);
+
+  // Subscribe to topic
+  sprintf(buf, "AT+QMTSUB=0,1,\"%s\",1", DL_TOPIC);
+  bg77_at(buf, 1000);
+  // AT+QMTSUB=<client_idx>,<msgID>,<topic1>,<qos1>[,<topic2>,<qos2>…]
+
+  //If a client subscribes to a topic named “$aws/things/MQTT-1/shadow/update/accepted” and other
+  //  devices publish the same topic to the server, the module will report the following information.
+  //  +QMTRECV: 0,1,"$aws/things/MQTT-1/shadow/update/accepted","This is publish data from client"
+
+  // Publish to topic
+  sprintf(buf, "AT+QMTPUB=0,1,1,0,\"%s\"", UL_TOPIC);
+  // AT+QMTPUB=<client_idx>,<msgID>,<qos>,<retain>,<topic>,<msglen>
+  bg77_at(buf, 200);
+  bg77_at("{{INSERT MESSAGE}}", 1000);
+
+  // Disconnect from the MQTT Server
+  bg77_at("AT+QMTDISC=0", 100);
+
+  return "";
+}
+
+float read_uart_sensor()
+{
+  unsigned char data[4]={};
+  float distance;
+  int num_measurements = 10;
+
+  // Reopen Serial1 on a new baud rate
+  //  Serial1.end();
+  Serial1.flush();
+  Serial1.begin(9600);
+  while (Serial1.available()) Serial1.read();
+
+  digitalWrite(ULTRASONIC_PWR_ON, HIGH); // Turn Power to sensor on
+  delay(1200);
+
+  while (Serial1.available()) Serial1.read();
+
+  float measurements[num_measurements] = {};
+  // Serial.print("Measurements = ");
+  
+  for (int m=0;m<num_measurements;m++){
+
+    delay(100);
+
+    // Read measurement from sensor
+    do{
+    for(int i=0;i<4;i++)
+    {
+      data[i]=Serial1.read();
+    }
+    }while(Serial1.read()==0xff);
+  
+    Serial1.flush();
+  
+    if(data[0]==0xff)
+    {
+      int sum;
+      sum=(data[0]+data[1]+data[2])&0x00FF;
+      if(sum==data[3])
+      {
+      distance=(data[1]<<8)+data[2];
+      if(distance>280)
+        {
+        measurements[m] = (distance/10);
+        }else 
+          {
+            // Serial.println("Below the lower limit");  
+            measurements[m] = 0;      
+          }
+      }
+      else
+      {
+        // Serial.println("ERROR");
+        measurements[m] = -1;
+      }
+    }
+    // Serial.print(measurements[m]);
+    // Serial.print(", ");
+  }
+  // Serial.println(";");
+  
+  Serial1.end();
+  digitalWrite(ULTRASONIC_PWR_ON, LOW); // Turn Power to sensor off
+
+  float sum = 0;
+  for (int i=0 ; i<num_measurements; i++) { 
+    if (measurements[i] > 0) sum += measurements[i];
+  }
+  float result = ((float) sum) / num_measurements;  // average will be fractional, so float may be appropriate.
+
+  // Display result as string
+  char sz[20] = {' '};
+  int val_int = (int) result;  // compute the integer part of the float
+  float val_float = (abs(result) - abs(val_int)) * 100000;
+  int val_fra = (int)val_float;
+  sprintf (sz, "%d.%d", val_int, val_fra); //
+  MYLOG("APP", sz);
+  return result;
 }
