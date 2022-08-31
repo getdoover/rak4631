@@ -741,7 +741,7 @@ String exchange_data(String message)
   sprintf(buf, "AT+QMTPUB=0,1,1,0,\"%s\"", UL_TOPIC);
   // AT+QMTPUB=<client_idx>,<msgID>,<qos>,<retain>,<topic>,<msglen>
   bg77_at(buf, 200);
-  bg77_at("{{INSERT MESSAGE}}", 1000);
+  bg77_at("{\"did_work\" : true}", 1000);
 
   // Disconnect from the MQTT Server
   bg77_at("AT+QMTDISC=0", 100);
