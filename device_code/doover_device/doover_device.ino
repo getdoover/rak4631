@@ -65,14 +65,14 @@
    - over BLE with My nRF52 Toolbox
 */
 
-const char ENDPOINT[] = {{ endpoint }};
+const char ENDPOINT[] = "{{ endpoint }}";
 // const char ENDPOINT[] = "a1zgnxur10j8ux.iot.us-east-1.amazonaws.com";
 const int ENDPOINT_PORT = {{ endpoint_port }};
 // const int ENDPOINT_PORT = 8883;
 
-const char DL_TOPIC[] = {{ downlink_topic }};
+const char DL_TOPIC[] = "{{ downlink_topic }}";
 // const char DL_TOPIC[] = "$aws/things/MQTT-1/shadow/update/accepted";
-const int UL_TOPIC[] = {{ uplink_topic }};
+const char UL_TOPIC[] = "{{ uplink_topic }}";
 // const char UL_TOPIC[] = "$aws/things/MQTT-1/shadow/update/accepted";
 
 const char CA_CERT[] = R"EOF(
@@ -657,7 +657,7 @@ void sleep_modem()
 String bg77_at(const char *at, uint16_t timeout)
 {
   String bg77_rsp = "";
-  char tmp[256] = {0};
+  char tmp[2048] = {0};
   int len = strlen(at);
   strncpy(tmp, at, len);
   uint16_t t = timeout;
