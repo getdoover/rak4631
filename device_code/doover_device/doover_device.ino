@@ -12,7 +12,7 @@
 
 // Debug output set to 0 to disable app debug output
 #ifndef MY_DEBUG
-#define MY_DEBUG 1
+#define MY_DEBUG 0
 #endif
 
 #ifdef NRF52_SERIES
@@ -65,18 +65,39 @@
    - over BLE with My nRF52 Toolbox
 */
 
-const char ENDPOINT[] = "{{ endpoint }}";
-// const char ENDPOINT[] = "a1zgnxur10j8ux.iot.us-east-1.amazonaws.com";
-const int ENDPOINT_PORT = {{ endpoint_port }};
-// const int ENDPOINT_PORT = 8883;
+const char CLIENT_ID[] PROGMEM = "{{ client_id }}";
+// const char CLIENT_ID[] PROGMEM = "9d1ba06a-6400-42f2-a708-39b83b32a458";
 
 const char DL_TOPIC[] = "{{ downlink_topic }}";
 // const char DL_TOPIC[] = "$aws/things/MQTT-1/shadow/update/accepted";
 const char UL_TOPIC[] = "{{ uplink_topic }}";
 // const char UL_TOPIC[] = "$aws/things/MQTT-1/shadow/update/accepted";
 
-const char CA_CERT[] = R"EOF(
-{{ ca_cert }}
+// const char CA_CERT[] = R"EOF(
+// {{ ca_cert }}
+// )EOF";
+const char DEVICE_CERT[] PROGMEM = R"EOF(
+-----BEGIN CERTIFICATE-----
+MIIDWjCCAkKgAwIBAgIVAMDLAoBax/GeScpzQQ7bRjHQ28GaMA0GCSqGSIb3DQEB
+CwUAME0xSzBJBgNVBAsMQkFtYXpvbiBXZWIgU2VydmljZXMgTz1BbWF6b24uY29t
+IEluYy4gTD1TZWF0dGxlIFNUPVdhc2hpbmd0b24gQz1VUzAeFw0yMjA4MzEwNDIw
+NThaFw00OTEyMzEyMzU5NTlaMB4xHDAaBgNVBAMME0FXUyBJb1QgQ2VydGlmaWNh
+dGUwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDPA9/LbtcgQ/4l5n3e
+RwPVRpp4utsSYy5/3Y8RftHhwxFEGkp/1k7ByKyV/q/UQeZsIOu94k/MY8a7nBqM
+qnWOMVuzPLN5aHPsgaubVoPrG0rIyxoOKsPI19MLQ/vhBnsRHkeMORMgkkneKjJh
+0lORAYXLHHjZvASeJSQ9/tLoKR8B2VwLiZafWDrJBI0eFgDyp3+mKUA3d5nKLyoO
+4W+Lorkl23t8dmlumZQrZuUVItKcgtA3w+vLyYsVq/VzUPI1dN1HSk9ziEcOnJDU
+fWDppQJCtUYNcH6LWs/49Jo2eSNaTE95vZJU9dnVw6fQvyBdVBOhVGlhQ8zYBT4j
+PxbBAgMBAAGjYDBeMB8GA1UdIwQYMBaAFMaEGJw8rZINSk9+yJ6xVDC8b/r3MB0G
+A1UdDgQWBBTE91fJw+ozYeW3ak4zoSOsXivnGTAMBgNVHRMBAf8EAjAAMA4GA1Ud
+DwEB/wQEAwIHgDANBgkqhkiG9w0BAQsFAAOCAQEARN+bnxQpwfLAsO45QUnlOp7n
+WkO8OVHh7IgP9/P1f5Jp339PV79dASyMxoNbh3cBLJnkWEb+YIi5lGlzbTBAY+3t
+Kq0OQN/kc2i/qi2OKBSvTUeE8vTWJ4QsL5ZNoWqps281HXxhFlW2+cpYHHkvNOtK
+P43oqhTME0LpHgr/syWeLI3UnKpirbtYMewwjIKalE9WuaszBtN/YgL/sEnxpioh
+G+n1FDZppi4QMZ0GTAChdlzdau1wkeYfrTHjpSZJxIIZwv7Aey68XaY6xL0pcvZe
+WBNQ0U34zuhqLb902XTLNMFLQCJAF+klRJUiUtXKVtHBp8Z5w6kDyB1uNb14uQ==
+-----END CERTIFICATE-----
+
 )EOF";
 
 const char DEVICE_CERT[] = R"EOF(
@@ -106,8 +127,9 @@ float read_uart_sensor(void);
 void send_periodic_mqtt_message(void);
 void wake_modem(void);
 void configure_modem(void);
+void configure_modem_certs(void);
 void wait_for_modem_connect(void);
-String exchange_data(String message);
+String exchange_data(char* message);
 void sleep_modem(void);
 
 String bg77_at(const char *at, uint16_t timeout);
@@ -222,11 +244,9 @@ void setup_app(void)
 bool init_app(void)
 {
   MYLOG("APP", "init_app");
-  send_periodic_mqtt_message();
   api_timer_init();
-//  g_lorawan_initialized = true;
-//  api_timer_start();
   api_timer_restart(sleep_time);
+  send_periodic_mqtt_message();
   MYLOG("APP", "init_app complete");
   return true;
 }
@@ -473,11 +493,12 @@ void send_periodic_mqtt_message(void)
   MYLOG("APP", "------Batt Level (Percent)------- =  %d", vbat_per);
   
   // Compile the mqtt packet
-  String test_message = "{\"is_working\": true}";
+  char test_message[] = "{\"is_working\": true}";
 
   // Send data
   wake_modem();
   configure_modem();
+  configure_modem_certs();
   wait_for_modem_connect();
   String recv_data = exchange_data(test_message);
   sleep_modem();
@@ -528,17 +549,13 @@ void wake_modem()
   MYLOG("APP", "BG77 power up");
 
   // Wait for modem 'RDY'
-  delay(1000);
+  delay(1500);
 
   //active and join to the net, this part may depend on some information of your operator.
   bg77_at("AT+CFUN=1,0", 100);
-  //  delay(300);
-  //  bg77_at("AT+CPIN?", 500);
-  //  delay(300);
-  //  bg77_at("AT+QNWINFO", 500);
-  //  delay(300);
-  //  bg77_at("AT+QCSQ", 500);
-  //  delay(300);
+  
+  bg77_at("AT+CGDCONT=1,\"IP\",\"telstra.iph\",\"0.0.0.0\",0,0", 100);
+  bg77_at("AT+QIACT=1", 100);
 
 }
 
@@ -562,8 +579,8 @@ void wait_for_modem_connect(){
     delay(250);
   }
   
-  bg77_at("AT+CGDCONT=1,\"IP\",\"telstra.iph\",\"0.0.0.0\",0,0", 100);
-  bg77_at("AT+QIACT=1", 250);
+//  bg77_at("AT+CGDCONT=1,\"IP\",\"telstra.iph\",\"0.0.0.0\",0,0", 100);
+//  bg77_at("AT+QIACT=1", 3000);
 
 }
 
@@ -663,11 +680,11 @@ String bg77_at(const char *at, uint16_t timeout)
   uint16_t t = timeout;
   tmp[len] = '\r';
 
-  //  Serial.write(tmp);
-  //  Serial.write("\n");
+//  Serial.write(tmp);
+//  Serial.write("\n");
 
   Serial1.write(tmp);
-  delay(10);
+  delay(25);
   while (t--)
   {
     if (Serial1.available())
@@ -678,26 +695,41 @@ String bg77_at(const char *at, uint16_t timeout)
   }
   bg77_rsp.trim(); // Remove unnecessary whitespace
 //  Serial.println(bg77_rsp);
-  char buf[100];
-  bg77_rsp.toCharArray(buf, 100);
+  char buf[128];
+  bg77_rsp.toCharArray(buf, 128);
   MYLOG("APP", buf);
 
+//  bg77_rsp.toCharArray(tmp, 2048);
+//  MYLOG("APP", tmp);
+//  delay(50);
+  
   return bg77_rsp;
 }
 
 
-void configure_modem(){
+void configure_modem()
+{
 
   //https://www.quectel.com/wp-content/uploads/2021/03/Quectel_BG95BG77BG600L_Series_MQTT_Application_Note_V1.1-1.pdf
 
+//  // DNS Config
+//  bg77_at("AT+QIDNSCFG=1,\"8.8.8.8\",\"8.8.4.4\"", 100); //Set DNS Server.
+
   // MQTT Config
+  bg77_at("AT+QMTCFG=\"pdpcid\",1", 100); //Set MQTT client to use PDP context 1.
   bg77_at("AT+QMTCFG=\"ssl\",0,1,2", 100); //Set SSL context ID as 1.
+//  bg77_at("AT+QMTCFG=\"ssl\",0,1,1", 100); //Set SSL context ID as 1.
   bg77_at("AT+QSSLCFG=\"seclevel\",2,2", 100); //SSL authentication mode: server and client authentication
   bg77_at("AT+QSSLCFG=\"sslversion\",2,4", 100); //Set SSL version
   //  bg77_at("AT+QSSLCFG=\"ciphersuite\",2,0XFFFF", 100); //Set SSL cipher suite
   bg77_at("AT+QSSLCFG=\"ignorelocaltime\",2,1", 100); //Ignore the time of authentication
+}
 
+void configure_modem_certs()
+{
   char buf[50];
+  
+  bg77_at("AT+QFDEL=\"cacert.pem\"", 100);
   sprintf(buf, "AT+QFUPL=\"cacert.pem\",%d,100", sizeof(CA_CERT));
   bg77_at(buf, 100);
   // "CONNECT"
@@ -705,6 +737,7 @@ void configure_modem(){
   bg77_at("AT+QSSLCFG=\"cacert\",2,\"cacert.pem\"", 100);
 
   // Upload Client Cert File ".pem"
+  bg77_at("AT+QFDEL=\"client.pem\"", 100);
   sprintf(buf, "AT+QFUPL=\"client.pem\",%d,100", sizeof(DEVICE_CERT));
   bg77_at(buf, 100);
   // "CONNECT"
@@ -712,6 +745,7 @@ void configure_modem(){
   bg77_at("AT+QSSLCFG=\"clientcert\",2,\"client.pem\"", 100);
 
   // Upload Client Private Key ".pem"
+  bg77_at("AT+QFDEL=\"user_key.pem\"", 100);
   sprintf(buf, "AT+QFUPL=\"user_key.pem\",%d,100", sizeof(PRIV_KEY));
   bg77_at(buf, 100);
   // "CONNECT"
@@ -719,18 +753,21 @@ void configure_modem(){
   bg77_at("AT+QSSLCFG=\"clientkey\",2,\"user_key.pem\"", 100);
 }
 
-String exchange_data(String message)
+String exchange_data(char* message)
 {
   // https://www.quectel.com/wp-content/uploads/2021/03/Quectel_BG95BG77BG600L_Series_MQTT_Application_Note_V1.1-1.pdf
 
-  char buf[100];
+  char buf[128];
+
   sprintf(buf, "AT+QMTOPEN=0,\"%s\",%d", ENDPOINT, ENDPOINT_PORT);
-  bg77_at(buf, 1000);
-  bg77_at("AT+QMTCONN=0,\"MQTT-1\"", 1000);
+  bg77_at(buf, 5000);
+  
+  sprintf(buf, "AT+QMTCONN=0,\"%s\"", CLIENT_ID);  
+  bg77_at(buf, 3000);
 
   // Subscribe to topic
   sprintf(buf, "AT+QMTSUB=0,1,\"%s\",1", DL_TOPIC);
-  bg77_at(buf, 1000);
+  bg77_at(buf, 3000);
   // AT+QMTSUB=<client_idx>,<msgID>,<topic1>,<qos1>[,<topic2>,<qos2>…]
 
   //If a client subscribes to a topic named “$aws/things/MQTT-1/shadow/update/accepted” and other
@@ -738,13 +775,14 @@ String exchange_data(String message)
   //  +QMTRECV: 0,1,"$aws/things/MQTT-1/shadow/update/accepted","This is publish data from client"
 
   // Publish to topic
-  sprintf(buf, "AT+QMTPUB=0,1,1,0,\"%s\"", UL_TOPIC);
+//  sprintf(buf, "AT+QMTPUB=0,1,1,0,\"%s\",%d", UL_TOPIC, strlen(message));
+  sprintf(buf, "AT+QMTPUB=0,0,0,0,\"%s\",%d", UL_TOPIC, strlen(message));
   // AT+QMTPUB=<client_idx>,<msgID>,<qos>,<retain>,<topic>,<msglen>
   bg77_at(buf, 200);
-  bg77_at("{\"did_work\" : true}", 1000);
+  bg77_at(message, 3000);
 
   // Disconnect from the MQTT Server
-  bg77_at("AT+QMTDISC=0", 100);
+  bg77_at("AT+QMTDISC=0", 500);
 
   return "";
 }
