@@ -242,6 +242,13 @@ class target:
                             #     "colour": "blue",
                             #     "requiresConfirm": True
                             # },
+                            "rawlevel" : {
+                                "type": "uiVariable",
+                                "name": "rawlevel",
+                                "displayString": "Level (cm)",
+                                "varType": "float",
+                                "decPrecision": 2
+                            },
                             "rawBattery": {
                                 "type": "uiVariable",
                                 "name": "rawBattery",
