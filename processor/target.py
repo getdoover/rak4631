@@ -235,13 +235,13 @@ class target:
                                 "min": 0.1,
                                 "max": 999
                             },
-                            "burstMode": {
-                                "type": "uiAction",
-                                "name": "burstMode",
-                                "displayString": "Burst Mode",
-                                "colour": "blue",
-                                "requiresConfirm": True
-                            },
+                            # "burstMode": {
+                            #     "type": "uiAction",
+                            #     "name": "burstMode",
+                            #     "displayString": "Burst Mode",
+                            #     "colour": "blue",
+                            #     "requiresConfirm": True
+                            # },
                             "rawBattery": {
                                 "type": "uiVariable",
                                 "name": "rawBattery",
