@@ -158,36 +158,36 @@ class target:
                             }
                         ]
                     },
-                    "signalStrength": {
-                        "type": "uiVariable",
-                        "name": "signalStrength",
-                        "displayString": "Signal Strength (%)",
-                        "varType": "float",
-                        "decPrecision": 0,
-                        "ranges": [
-                            {
-                                "label" : "Low",
-                                "min" : 0,
-                                "max" : 30,
-                                "colour" : "yellow",
-                                "showOnGraph" : True
-                            },
-                            {
-                                "label" : "Ok",
-                                "min" : 30,
-                                "max" : 60,
-                                "colour" : "blue",
-                                "showOnGraph" : True
-                            },
-                            {
-                                "label" : "Strong",
-                                "min" : 60,
-                                "max" : 100,
-                                "colour" : "green",
-                                "showOnGraph" : True
-                            }
-                        ]
-                    },
+                    # "signalStrength": {
+                    #     "type": "uiVariable",
+                    #     "name": "signalStrength",
+                    #     "displayString": "Signal Strength (%)",
+                    #     "varType": "float",
+                    #     "decPrecision": 0,
+                    #     "ranges": [
+                    #         {
+                    #             "label" : "Low",
+                    #             "min" : 0,
+                    #             "max" : 30,
+                    #             "colour" : "yellow",
+                    #             "showOnGraph" : True
+                    #         },
+                    #         {
+                    #             "label" : "Ok",
+                    #             "min" : 30,
+                    #             "max" : 60,
+                    #             "colour" : "blue",
+                    #             "showOnGraph" : True
+                    #         },
+                    #         {
+                    #             "label" : "Strong",
+                    #             "min" : 60,
+                    #             "max" : 100,
+                    #             "colour" : "green",
+                    #             "showOnGraph" : True
+                    #         }
+                    #     ]
+                    # },
                     "details_submodule": {
                         "type": "uiSubmodule",
                         "name": "details_submodule",
@@ -200,13 +200,13 @@ class target:
                                 "min": 0,
                                 "max": 999
                             },
-                            "inputLowLevel": {
-                                "type": "uiFloatParam",
-                                "name": "inputLowLevel",
-                                "displayString": "Low level alarm (%)",
-                                "min": 0,
-                                "max": 99
-                            },
+                            # "inputLowLevel": {
+                            #     "type": "uiFloatParam",
+                            #     "name": "inputLowLevel",
+                            #     "displayString": "Low level alarm (%)",
+                            #     "min": 0,
+                            #     "max": 99
+                            # },
                             "inputZeroCal": {
                                 "type": "uiFloatParam",
                                 "name": "inputZeroCal",
@@ -249,12 +249,12 @@ class target:
                                 "varType": "float",
                                 "decPrecision": 2
                             },
-                            "lastRSSI": {
-                                "type": "uiVariable",
-                                "name": "lastRSSI",
-                                "displayString": "Last RSSI",
-                                "varType": "float"
-                            },
+                            # "lastRSSI": {
+                            #     "type": "uiVariable",
+                            #     "name": "lastRSSI",
+                            #     "displayString": "Last RSSI",
+                            #     "varType": "float"
+                            # },
                         }
                     },
                     "node_connection_info": {
@@ -276,23 +276,28 @@ class target:
     def uplink(self):
         ## Run any uplink processing code here
         
-        ## Get the deployment channel
+        ## Get the uplink channel
+        uplink_channel = self.cli.get_channel(
+            channel_name="device_uplinks",
+            agent_id=self.kwargs['agent_id']
+        )
+
+        ## Get the state channel
         ui_state_channel = self.cli.get_channel(
             channel_name="ui_state",
             agent_id=self.kwargs['agent_id']
         )
 
-        ## Get the deployment channel
+        ## Get the cmds channel
         ui_cmds_channel = self.cli.get_channel(
             channel_name="ui_cmds",
             agent_id=self.kwargs['agent_id']
         )
 
-        self.compute_output_levels(ui_cmds_channel, ui_state_channel)
-        self.update_reported_signal_strengths(ui_cmds_channel, ui_state_channel)
+        self.compute_output_levels(ui_cmds_channel, ui_state_channel, uplink_channel)
 
         ui_state_channel.update() ## Update the details stored in the state channel so that warnings are computed from current values
-        self.assess_warnings(ui_cmds_channel, ui_state_channel)
+        self.assess_warnings(ui_cmds_channel, ui_state_channel, uplink_channel)
 
 
     def downlink(self):
@@ -322,21 +327,28 @@ class target:
             )
 
     ## Compute output values from raw values
-    def compute_output_levels(self, cmds_channel, state_channel):
+    def compute_output_levels(self, cmds_channel, state_channel, uplink_channel):
 
+        uplink_obj = uplink_channel.get_aggregate()
         state_obj = state_channel.get_aggregate()
         cmds_obj = cmds_channel.get_aggregate()
 
+        uplink_interval = 30 * 60
+        try:
+            uplink_interval = uplink_obj['uplink_interval']
+        except Exception as e:
+            self.add_to_log("Could not get uplink interval seconds - " + str(e))
+
         batt_percent = None
         try:
-            batt_volts = state_obj['state']['children']['details_submodule']['children']['rawBattery']['currentValue']
+            batt_volts = uplink_obj['batt_volts']
             batt_percent = self.batt_volts_to_percent(batt_volts) * 100
         except Exception as e:
             self.add_to_log("Could not get battery raw volts - " + str(e))
 
         raw_reading_1 = None
         try:
-            raw_reading_1 = state_obj['state']['children']['details_submodule']['children']['rawlevel']['currentValue']
+            raw_reading_1 = uplink_obj['measured_level']
         except Exception as e:
             self.add_to_log("Could not get current raw reading - " + str(e))
 
@@ -383,10 +395,17 @@ class target:
                             "rawlevel" : {
                                 "currentValue" : raw_reading_1
                             },
+                            "rawBattery" : {
+                                "currentValue" : batt_volts
+                            }
                             # "rawlevel_processed" : {
                             #     "currentValue" : input1_processed
                             # }
                         }
+                    },
+                    "node_connection_info": {
+                        "connectionPeriod": uplink_interval,
+                        "nextConnection": uplink_interval
                     }
                 }
             }
@@ -411,12 +430,14 @@ class target:
         return out_val
         
 
-    def assess_warnings(self, cmds_channel, state_channel):
-        cmds_obj = cmds_channel.get_aggregate()
+    def assess_warnings(self, cmds_channel, state_channel, uplink_channel):
         
+        uplink_obj = uplink_channel.get_aggregate()
+        cmds_obj = cmds_channel.get_aggregate()
+
         level_alarm = None
-        try: level_alarm = cmds_obj['cmds']['inputLowLevel']
-        except Exception as e: self.add_to_log("Could not get level alarm")
+        # try: level_alarm = cmds_obj['cmds']['inputLowLevel']
+        # except Exception as e: self.add_to_log("Could not get level alarm")
 
         battery_alarm = None
         try: battery_alarm = cmds_obj['cmds']['battAlarmLevel']
@@ -425,8 +446,8 @@ class target:
         state_obj = state_channel.get_aggregate()
 
         curr_level = None
-        try: curr_level = state_obj['state']['children']['level']['currentValue']
-        except Exception as e: self.add_to_log("Could not get current level - " + str(e))
+        # try: curr_level = state_obj['state']['children']['level']['currentValue']
+        # except Exception as e: self.add_to_log("Could not get current level - " + str(e))
 
         curr_battery_level = None
         try: curr_battery_level = state_obj['state']['children']['batteryLevel']['currentValue']
@@ -569,72 +590,6 @@ class target:
 
         return last_notification_age
 
-
-    def update_reported_signal_strengths(self, cmds_channel, state_channel):
-
-        msg_id = channel_id = payload = None
-        if 'msg_obj' in self.kwargs and self.kwargs['msg_obj'] is not None:
-            msg_id = self.kwargs['msg_obj']['message']
-            channel_id = self.kwargs['msg_obj']['channel']
-            payload = self.kwargs['msg_obj']['payload']
-
-        if not msg_id:
-            self.add_to_log( "No trigger message passed - skipping processing" )
-        else:
-            
-            # trigger_msg = pd.message_log(
-            #     api_client=self.cli.api_client,
-            #     message_id=msg_id,
-            #     channel_id=channel_id,
-            # )
-            # trigger_msg.update()
-
-            # payload = json.loads( trigger_msg.get_payload() )
-
-            rssi = snr = gateway_id = None
-            try:
-                rssi = payload['uplink_message']['rx_metadata'][0]['rssi']
-                snr = payload['uplink_message']['rx_metadata'][0]['snr']
-                gateway_id = payload['uplink_message']['rx_metadata'][0]['gateway_ids']['gateway_id']
-            except Exception as e:
-                self.add_to_log("Could not extract rssi and snr data")
-                pass
-
-            if rssi and snr and gateway_id:
-                
-                min_rssi = -130
-                max_rssi = -50
-                signal_strength_percent = int(((rssi - max_rssi) / (max_rssi - min_rssi) + 1) * 100)
-                signal_strength_percent = max(signal_strength_percent, 0)
-                signal_strength_percent = min(signal_strength_percent, 100)
-
-                msg_obj = {
-                    "state" : {
-                        "children" : {
-                            "signalStrength" : {
-                                "currentValue" : signal_strength_percent
-                            },
-                            "details_submodule" : {
-                                "children" : {
-                                    "lastRSSI" : {
-                                        "currentValue" : rssi
-                                    },
-                                    "lastSNR" : {
-                                        "currentValue" : snr
-                                    },
-                                    "lastUsedGateway" : {
-                                        "currentValue" : gateway_id
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                state_channel.publish(
-                    msg_str=json.dumps(msg_obj),
-                    save_log=False
-                )
-
     
     def send_uplink_interval_if_required(self):
 
@@ -662,12 +617,12 @@ class target:
 
             self.add_to_log(msg_obj)
 
-            tts_dl_channel = pd.channel(
+            device_dl_channel = pd.channel(
                 api_client=self.cli.api_client,
                 agent_id=self.kwargs['agent_id'],
-                channel_name="tts_downlinks"
+                channel_name="device_downlinks"
             )
-            tts_dl_channel.publish(
+            device_dl_channel.publish(
                 msg_str=json.dumps(msg_obj),
             )
 
@@ -690,11 +645,11 @@ class target:
                 "burst_mode" : True
             }
 
-            tts_dl_channel = pd.channel(
+            device_dl_channel = pd.channel(
                 api_client=self.cli.api_client,
                 agent_id=self.kwargs['agent_id'],
-                channel_name="tts_downlinks"
+                channel_name="device_downlinks"
             )
-            tts_dl_channel.publish(
+            device_dl_channel.publish(
                 msg_str=json.dumps(msg_obj),
             )
