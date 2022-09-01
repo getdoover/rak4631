@@ -339,6 +339,7 @@ class target:
         except Exception as e:
             self.add_to_log("Could not get uplink interval seconds - " + str(e))
 
+        batt_volts = None
         batt_percent = None
         try:
             batt_volts = uplink_obj['batt_mvolts'] / 1000
