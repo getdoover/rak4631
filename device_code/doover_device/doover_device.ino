@@ -493,8 +493,8 @@ void send_periodic_mqtt_message(void)
   MYLOG("APP", "------Batt Level (Percent)------- =  %d", vbat_per);
   
   // Compile the mqtt packet
-  char msg_buf[50];
-  sprintf(msg_buf, "{\"level_cm\": %f, \"batt_mvolts\": %d, \"uplink_interval_secs\": %d}", sensor_reading, vbat_mv, sleep_time);
+  char msg_buf[60];
+  sprintf(msg_buf, "{\"level_cm\": %f, \"batt_mvolts\": %d, \"uplink_interval_secs\": %d}", sensor_reading, vbat_mv, (sleep_time/1000));
 //   char test_message[] = "{\"is_working\": true}";
 
   // Send data
@@ -502,7 +502,7 @@ void send_periodic_mqtt_message(void)
   configure_modem();
   configure_modem_certs();
   wait_for_modem_connect();
-  String recv_data = exchange_data(test_message);
+  String recv_data = exchange_data(msg_buf);
   sleep_modem();
 
   MYLOG("APP", "Packet Sent");

@@ -377,9 +377,9 @@ class target:
             input1_percentage_level = round((input1_processed / sensor_1_max) * 100, 1)
 
         # https://www.mathsisfun.com/geometry/cylinder-horizontal-volume.html
-        r = 50 ## 50 %
-        h = input1_percentage_level
-        input1_percentage_level = (math.acos((r-h)/r)*(r*r)) - ((r-h)*math.sqrt(2*r*h-(h*h)))
+        # r = 50 ## 50 %
+        # h = input1_percentage_level
+        # input1_percentage_level = (math.acos((r-h)/r)*(r*r)) - ((r-h)*math.sqrt(2*r*h-(h*h)))
 
         msg_obj = {
             "state" : {
