@@ -335,20 +335,20 @@ class target:
 
         uplink_interval = 30 * 60
         try:
-            uplink_interval = uplink_obj['uplink_interval']
+            uplink_interval = uplink_obj['uplink_interval_secs']
         except Exception as e:
             self.add_to_log("Could not get uplink interval seconds - " + str(e))
 
         batt_percent = None
         try:
-            batt_volts = uplink_obj['batt_volts']
+            batt_volts = uplink_obj['batt_mvolts'] / 1000
             batt_percent = self.batt_volts_to_percent(batt_volts) * 100
         except Exception as e:
             self.add_to_log("Could not get battery raw volts - " + str(e))
 
         raw_reading_1 = None
         try:
-            raw_reading_1 = uplink_obj['measured_level']
+            raw_reading_1 = uplink_obj['level_cm']
         except Exception as e:
             self.add_to_log("Could not get current raw reading - " + str(e))
 

@@ -493,7 +493,9 @@ void send_periodic_mqtt_message(void)
   MYLOG("APP", "------Batt Level (Percent)------- =  %d", vbat_per);
   
   // Compile the mqtt packet
-  char test_message[] = "{\"is_working\": true}";
+  char msg_buf[50];
+  sprintf(msg_buf, "{\"level_cm\": %f, \"batt_mvolts\": %d, \"uplink_interval_secs\": %d}", sensor_reading, vbat_mv, sleep_time);
+//   char test_message[] = "{\"is_working\": true}";
 
   // Send data
   wake_modem();
