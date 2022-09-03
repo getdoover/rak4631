@@ -444,8 +444,8 @@ class target:
         cmds_obj = cmds_channel.get_aggregate()
 
         level_alarm = None
-        # try: level_alarm = cmds_obj['cmds']['inputLowLevel']
-        # except Exception as e: self.add_to_log("Could not get level alarm")
+        try: level_alarm = cmds_obj['cmds']['inputLowLevel']
+        except Exception as e: self.add_to_log("Could not get level alarm")
 
         battery_alarm = None
         try: battery_alarm = cmds_obj['cmds']['battAlarmLevel']
@@ -454,8 +454,8 @@ class target:
         state_obj = state_channel.get_aggregate()
 
         curr_level = None
-        # try: curr_level = state_obj['state']['children']['level']['currentValue']
-        # except Exception as e: self.add_to_log("Could not get current level - " + str(e))
+        try: curr_level = state_obj['state']['children']['level']['currentValue']
+        except Exception as e: self.add_to_log("Could not get current level - " + str(e))
 
         curr_battery_level = None
         try: curr_battery_level = state_obj['state']['children']['batteryLevel']['currentValue']
