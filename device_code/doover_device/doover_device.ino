@@ -85,6 +85,7 @@ void ble_data_handler(void) __attribute__((weak));
 void lora_data_handler(void);
 bool send_periodic_lora_frame(void);
 
+float read_uart_sensor(void);
 
 /** Application stuff */
 uint32_t burst_mode_sleep_time = 30 * 1000; // 30 seconds
@@ -93,6 +94,7 @@ uint32_t burst_mode_counter = 20;
 uint32_t default_sleep_time = 10 * 60 * 1000; // 10 minutes
 uint32_t sleep_time = burst_mode_sleep_time;
 
+#define ULTRASONIC_PWR_ON WB_IO2
 
 // Battery Voltage
 #define PIN_VBAT WB_A0
@@ -188,6 +190,10 @@ void setup_app(void)
 bool init_app(void)
 {
 	MYLOG("APP", "init_app");
+
+	pinMode(ULTRASONIC_PWR_ON, OUTPUT);
+  	digitalWrite(ULTRASONIC_PWR_ON, LOW); // Turn Power to sensor off
+
 	return true;
 }
 
@@ -446,33 +452,12 @@ bool send_periodic_lora_frame(void)
 	
 
 	// Make a sensor reading
-    int sensor_pin = A1;   // select the input pin for the potentiometer
-    int mcu_ain_value = 0;  
-    int average_value;  
-    float voltage_ain;
-    float current_sensor; // variable to store the value coming from the sensor
-
-	/* WisBLOCK 5801 Power On*/
-	pinMode(WB_IO1, OUTPUT);
-	digitalWrite(WB_IO1, HIGH);
-	delay(500);
-	/* WisBLOCK 5801 Power On*/
-
-	// Take 10 readings, then get the average
-    int i;
-	for (i = 0; i < 10; i++){ mcu_ain_value += analogRead(sensor_pin); }
-
-    /* WisBLOCK 5801 Power Off*/
-  	digitalWrite(WB_IO1, LOW);
-    /* WisBLOCK 5801 Power Off*/
-
-    average_value = mcu_ain_value / i;
-    voltage_ain = average_value * 3.6 /1024;      //raef 3.6v / 10bit ADC
-    current_sensor = voltage_ain / 149.9 * 1000;    //WisBlock RAK5801 I=U/149.9\*1000 (mA)
-    int current_sensor_payload = current_sensor * 1000;
+    float result = read_uart_sensor();
+	int result_payload = result * 1000;
+	if (result < 0){ result_payload = -1 };
     
-	MYLOG("APP", "-------Current Sensor------ =  %f", current_sensor);
-	MYLOG("APP", "--Current Sensor Payload--- =  %d", current_sensor_payload);
+	MYLOG("APP", "------- Level Sensor (cm)------ =  %f", result);
+	MYLOG("APP", "-- Level Sensor Payload --- =  %d", result_payload);
 	MYLOG("APP", "-----Batt Voltage (mV)----- =  %d", vbat_mv);
 	MYLOG("APP", "------Batt Level (Percent)------- =  %d", vbat_per);
 	
@@ -481,8 +466,8 @@ bool send_periodic_lora_frame(void)
 	uint8_t m_lora_app_data_buffer[64]; // Max 64 bytes long
 
 	uint32_t buffSize = 0;
-	m_lora_app_data_buffer[buffSize++] = highByte(current_sensor_payload);
-	m_lora_app_data_buffer[buffSize++] = lowByte(current_sensor_payload);
+	m_lora_app_data_buffer[buffSize++] = highByte(result_payload);
+	m_lora_app_data_buffer[buffSize++] = lowByte(result_payload);
 	m_lora_app_data_buffer[buffSize++] = 0; // Reserved for second sensor
 	m_lora_app_data_buffer[buffSize++] = 0; // Reserved for second sensor
 	m_lora_app_data_buffer[buffSize++] = vbat_mv / 20;
@@ -502,4 +487,93 @@ bool send_periodic_lora_frame(void)
 
 	MYLOG("APP", "Packet Sent");
 	return (error == 0);
+}
+
+float read_uart_sensor()
+{
+  unsigned char data[4]={};
+  float distance;
+  int num_measurements = 10;
+
+  // Reopen Serial1 on a new baud rate
+  //  Serial1.end();
+  Serial1.flush();
+  Serial1.begin(9600);
+  while (Serial1.available()) Serial1.read();
+
+  digitalWrite(ULTRASONIC_PWR_ON, HIGH); // Turn Power to sensor on
+  delay(1200);
+
+  while (Serial1.available()) Serial1.read();
+
+  float measurements[num_measurements] = {};
+  // Serial.print("Measurements = ");
+  
+  for (int m=0;m<num_measurements;m++){
+
+    delay(100);
+
+    // Read measurement from sensor
+    do{
+    for(int i=0;i<4;i++)
+    {
+      data[i]=Serial1.read();
+    }
+    }while(Serial1.read()==0xff);
+  
+    Serial1.flush();
+  
+    if(data[0]==0xff)
+    {
+      int sum;
+      sum=(data[0]+data[1]+data[2])&0x00FF;
+      if(sum==data[3])
+      {
+      distance=(data[1]<<8)+data[2];
+      if(distance>280)
+        {
+        measurements[m] = (distance/10);
+        }else 
+          {
+            // Serial.println("Below the lower limit");  
+            measurements[m] = 0;      
+          }
+      }
+      else
+      {
+        // Serial.println("ERROR");
+        measurements[m] = -1;
+      }
+    }
+    // Serial.print(measurements[m]);
+    // Serial.print(", ");
+  }
+  // Serial.println(";");
+  
+  Serial1.end();
+  digitalWrite(ULTRASONIC_PWR_ON, LOW); // Turn Power to sensor off
+
+  float sum = 0;
+  int measurements_counter = 0;
+  for (int i=0 ; i<num_measurements; i++) { 
+    if (measurements[i] > 0)
+	{
+		sum += measurements[i];
+		measurements_counter++;
+	}
+  }
+  float result = 0;
+  if (measurements_counter > 0)
+  {
+  	result = ((float) sum) / measurements_counter;  // average will be fractional, so float may be appropriate.
+  }
+
+  // Display result as string
+  char sz[20] = {' '};
+  int val_int = (int) result;  // compute the integer part of the float
+  float val_float = (abs(result) - abs(val_int)) * 100000;
+  int val_fra = (int)val_float;
+  sprintf (sz, "%d.%d", val_int, val_fra); //
+  MYLOG("APP", sz);
+  return result;
 }
