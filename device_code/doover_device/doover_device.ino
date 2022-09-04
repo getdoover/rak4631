@@ -65,13 +65,13 @@
    - over BLE with My nRF52 Toolbox
 */
 
-const char CLIENT_ID[] PROGMEM = "{{ client_id }}";
-// const char CLIENT_ID[] PROGMEM = "9d1ba06a-6400-42f2-a708-39b83b32a458";
+const char CLIENT_ID[] = "{{ client_id }}";
+// const char CLIENT_ID[] = "9d1ba06a-6400-42f2-a708-39b83b32a458";
 
-const char ENDPOINT[] PROGMEM = "{{ endpoint }}";
-// const char ENDPOINT[] PROGMEM = "a1zgnxur10j8ux.iot.us-east-1.amazonaws.com";
-const int ENDPOINT_PORT PROGMEM = {{ endpoint_port }};
-// const int ENDPOINT_PORT PROGMEM = 8883;
+const char ENDPOINT[] = "{{ endpoint }}";
+// const char ENDPOINT[] = "a1zgnxur10j8ux.iot.us-east-1.amazonaws.com";
+const int ENDPOINT_PORT = {{ endpoint_port }};
+// const int ENDPOINT_PORT = 8883;
 
 const char DL_TOPIC[] = "{{ downlink_topic }}";
 // const char DL_TOPIC[] = "$aws/things/MQTT-1/shadow/update/accepted";
@@ -81,7 +81,7 @@ const char UL_TOPIC[] = "{{ uplink_topic }}";
 // const char CA_CERT[] = R"EOF(
 // {{ ca_cert }}
 // )EOF";
-const char CA_CERT[] PROGMEM = R"EOF(
+const char CA_CERT[] = R"EOF(
 -----BEGIN CERTIFICATE-----
 MIIDQTCCAimgAwIBAgITBmyfz5m/jAo54vB4ikPmljZbyjANBgkqhkiG9w0BAQsF
 ADA5MQswCQYDVQQGEwJVUzEPMA0GA1UEChMGQW1hem9uMRkwFwYDVQQDExBBbWF6
@@ -141,8 +141,8 @@ String bg77_at(const char *at, uint16_t timeout);
 
 
 /** Application stuff */
-uint32_t burst_mode_sleep_time = 60 * 1000; // 60 seconds
-uint32_t burst_mode_counter = 7;
+uint32_t burst_mode_sleep_time = 90 * 1000; // 60 seconds
+uint32_t burst_mode_counter = 5;
 
 uint32_t default_sleep_time = 30 * 60 * 1000; // 30 minutes
 uint32_t sleep_time = burst_mode_sleep_time;
@@ -217,7 +217,7 @@ void setup_app(void)
    // memcpy(g_lorawan_settings.node_nws_key, node_nws_key, 16);    // ABP Network Session Key MSB
    // memcpy(g_lorawan_settings.node_apps_key, node_apps_key, 16);  // ABP Application Session key MSB
    // g_lorawan_settings.node_dev_addr = 0x26021FB4;          // ABP Device Address MSB
-   g_lorawan_settings.send_repeat_time = 120000;          // Send repeat time in milliseconds: 2 * 60 * 1000 => 2 minutes
+   g_lorawan_settings.send_repeat_time = default_sleep_time;          // Send repeat time in milliseconds: 2 * 60 * 1000 => 2 minutes
    g_lorawan_settings.adr_enabled = true;             // Flag for ADR on or off
    g_lorawan_settings.public_network = true;            // Flag for public or private network
    g_lorawan_settings.duty_cycle_enabled = false;         // Flag to enable duty cycle (validity depends on Region)
@@ -786,7 +786,7 @@ String exchange_data(char* message)
   sprintf(buf, "AT+QMTPUB=0,0,0,0,\"%s\",%d", UL_TOPIC, strlen(message));
   // AT+QMTPUB=<client_idx>,<msgID>,<qos>,<retain>,<topic>,<msglen>
   bg77_at(buf, 200);
-  bg77_at(message, 3000);
+  bg77_at(message, 5000);
 
   // Disconnect from the MQTT Server
   bg77_at("AT+QMTDISC=0", 500);
@@ -867,7 +867,11 @@ float read_uart_sensor()
 		measurements_counter++;
 	}
   }
-  float result = ((float) sum) / measurements_counter;  // average will be fractional, so float may be appropriate.
+  float result = 0;
+  if (measurements_counter > 0)
+  {
+  	result = ((float) sum) / measurements_counter;  // average will be fractional, so float may be appropriate.
+  }
 
   // Display result as string
   char sz[20] = {' '};
