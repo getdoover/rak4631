@@ -455,7 +455,7 @@ bool send_periodic_lora_frame(void)
 
 	// Make a sensor reading
     float result = read_uart_sensor();
-	int result_payload = result * 1000;
+	int result_payload = result * 50;
 	if (result < 0){ result_payload = -1; };
     
 	MYLOG("APP", "------- Level Sensor (cm)------ =  %f", result);

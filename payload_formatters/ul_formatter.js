@@ -14,7 +14,7 @@ function decodeUplink(input) {
 
     var data = {};
 
-    data.current_reading = (input.bytes[0] << 8 | input.bytes[1]) / 1000;
+    data.current_reading = (input.bytes[0] << 8 | input.bytes[1]) / 50;
     // data.current_reading_2 = (input.bytes[2] << 8 | input.bytes[3]) / 1000;
     data.batt_mvolts = input.bytes[4] * 20
     data.sleep_time = (input.bytes[5] << 8 | input.bytes[6]);

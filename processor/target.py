@@ -262,14 +262,14 @@ class target:
                             "rawlevel": {
                                 "type": "uiVariable",
                                 "name": "rawlevel",
-                                "displayString": "Raw Reading (ma)",
+                                "displayString": "Raw Reading (cm)",
                                 "varType": "float",
                                 "decPrecision": 2
                             },
                             "rawlevel_processed": {
                                 "type": "uiVariable",
                                 "name": "rawlevel_processed",
-                                "displayString": "Raw Reading (cm)",
+                                "displayString": "Water Level (cm)",
                                 "varType": "float",
                                 "decPrecision": 1
                             },
