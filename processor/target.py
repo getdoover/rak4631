@@ -433,9 +433,9 @@ class target:
                     },
                     "details_submodule" : {
                         "children" : {
-                            "rawlevel" : {
-                                "currentValue" : raw_reading_1
-                            },
+                            # "rawlevel" : {
+                            #     "currentValue" : raw_reading_1
+                            # },
                             "rawlevel_processed" : {
                                 "currentValue" : input1_processed
                             }
