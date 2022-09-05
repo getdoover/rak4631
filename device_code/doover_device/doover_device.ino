@@ -189,10 +189,12 @@ void setup_app(void)
 */
 bool init_app(void)
 {
-	MYLOG("APP", "init_app");
+  	Serial1.begin(9600);
 
 	pinMode(ULTRASONIC_PWR_ON, OUTPUT);
   	digitalWrite(ULTRASONIC_PWR_ON, LOW); // Turn Power to sensor off
+
+	MYLOG("APP", "init_app");
 
 	return true;
 }
@@ -454,7 +456,7 @@ bool send_periodic_lora_frame(void)
 	// Make a sensor reading
     float result = read_uart_sensor();
 	int result_payload = result * 1000;
-	if (result < 0){ result_payload = -1 };
+	if (result < 0){ result_payload = -1; };
     
 	MYLOG("APP", "------- Level Sensor (cm)------ =  %f", result);
 	MYLOG("APP", "-- Level Sensor Payload --- =  %d", result_payload);
@@ -497,8 +499,7 @@ float read_uart_sensor()
 
   // Reopen Serial1 on a new baud rate
   //  Serial1.end();
-  Serial1.flush();
-  Serial1.begin(9600);
+//   Serial1.flush();
   while (Serial1.available()) Serial1.read();
 
   digitalWrite(ULTRASONIC_PWR_ON, HIGH); // Turn Power to sensor on
@@ -550,7 +551,7 @@ float read_uart_sensor()
   }
   // Serial.println(";");
   
-  Serial1.end();
+//   Serial1.end();
   digitalWrite(ULTRASONIC_PWR_ON, LOW); // Turn Power to sensor off
 
   float sum = 0;
