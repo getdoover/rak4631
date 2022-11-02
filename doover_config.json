@@ -1,5 +1,12 @@
 {
     "deployment_package_dir": "processor/",
+    "files": [
+        {
+            "name": "readme_file",
+            "file_dir": "README.md",
+            "mime_type": "text/markdown"
+        }
+    ],
     "installers" : [
         {
             "name": "default",
