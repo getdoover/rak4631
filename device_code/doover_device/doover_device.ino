@@ -6,6 +6,9 @@
    @date 2021-09-10
    @copyright Copyright (c) 2021
 */
+
+// Example 
+
 #include <Arduino.h>
 /** Add you required includes after Arduino.h */
 #include <Wire.h>
