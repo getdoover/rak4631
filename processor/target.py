@@ -100,14 +100,14 @@ class target:
                     "flowRate": {
                         "type": "uiVariable",
                         "name": "flowRate",
-                        "displayString": "Counts",
+                        "displayString": "Flow Rate (L/min)",
                         "varType": "float",
                         "decPrecision": 1,
                     },
                     "totalLitres": {
                         "type": "uiVariable",
                         "name": "totalLitres",
-                        "displayString": "Counts",
+                        "displayString": "Total Litres (L)",
                         "varType": "float",
                         "decPrecision": 1,
                     },
@@ -215,20 +215,20 @@ class target:
                         "name": "details_submodule",
                         "displayString": "Details",
                         "children": {
-                            "resetAfter": {
-                                "type": "uiFloatParam",
-                                "name": "resetAfter",
-                                "displayString": "Clear event after (hours)",
-                                "min": 0,
-                                "max": 999
-                            },
-                            "mmPerCount": {
-                                "type": "uiFloatParam",
-                                "name": "mmPerCount",
-                                "displayString": "mm per tip (mm)",
-                                "min": 0.001,
-                                "max": 10
-                            },
+                            # "resetAfter": {
+                            #     "type": "uiFloatParam",
+                            #     "name": "resetAfter",
+                            #     "displayString": "Clear event after (hours)",
+                            #     "min": 0,
+                            #     "max": 999
+                            # },
+                            # "mmPerCount": {
+                            #     "type": "uiFloatParam",
+                            #     "name": "mmPerCount",
+                            #     "displayString": "mm per tip (mm)",
+                            #     "min": 0.001,
+                            #     "max": 10
+                            # },
                             "tankType": {
                                 "type": "uiStateCommand",
                                 "name": "tankType",
@@ -298,14 +298,14 @@ class target:
                             "rawlevel": {
                                 "type": "uiVariable",
                                 "name": "rawlevel",
-                                "displayString": "Raw Reading (ma)",
+                                "displayString": "Raw Level Reading (mA)",
                                 "varType": "float",
                                 "decPrecision": 2
                             },
                             "rawlevel_processed": {
                                 "type": "uiVariable",
                                 "name": "rawlevel_processed",
-                                "displayString": "Raw Reading (cm)",
+                                "displayString": "Raw Level Reading (cm)",
                                 "varType": "float",
                                 "decPrecision": 1
                             },

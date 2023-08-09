@@ -19,7 +19,7 @@ function decodeUplink(input) {
     data.batt_mvolts = input.bytes[4] * 20
     data.sleep_time = (input.bytes[5] << 8 | input.bytes[6]);
     data.fast_rate_counter = input.bytes[7];
-    data.batt_percent = input.bytes[3]
+    data.batt_percent = input.bytes[12]
 
     data.batt_volts = data.batt_mvolts / 1000
 
@@ -85,7 +85,7 @@ function decodeUplink(input) {
                                 currentValue : data.total_count
                             },
                             lastCounts : {
-                                currentValue : data.last_count
+                                currentValue : data.count_reading
                             },
                             rawBattery : {
                                 currentValue : data.batt_volts

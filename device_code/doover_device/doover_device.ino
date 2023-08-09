@@ -90,7 +90,7 @@ bool init_app(void);
 void app_event_handler(void);
 void ble_data_handler(void) __attribute__((weak));
 void lora_data_handler(void);
-void pin_change_triggered(void)
+void pin_change_triggered(void);
 bool send_periodic_lora_frame(void);
 
 
@@ -528,7 +528,6 @@ bool send_periodic_lora_frame(void)
 	MYLOG("APP", "--Current Sensor Payload--- =  %d", current_sensor_payload);
 	MYLOG("APP", "-----Batt Voltage (mV)----- =  %d", vbat_mv);
 	MYLOG("APP", "---Batt Level (Percent)---- =  %d", vbat_per);
-	
 
 	// Compile the lora packet
 	uint8_t m_lora_app_data_buffer[64]; // Max 64 bytes long
@@ -547,7 +546,7 @@ bool send_periodic_lora_frame(void)
 	m_lora_app_data_buffer[buffSize++] = (total_counts >> 16) & 0xFF;      //9
 	m_lora_app_data_buffer[buffSize++] = (total_counts >> 8) & 0xFF;       //10
 	m_lora_app_data_buffer[buffSize++] = (total_counts) & 0xFF;            //11
-	// m_lora_app_data_buffer[buffSize++] = vbat_per;
+	m_lora_app_data_buffer[buffSize++] = vbat_per;						   //12
 	
 	//  m_lora_app_data_buffer[buffSize++] = 'l';
 	//  m_lora_app_data_buffer[buffSize++] = 'o';
@@ -557,7 +556,6 @@ bool send_periodic_lora_frame(void)
 	m_lora_app_data.port = 2;
 
 	lmh_error_status error = lmh_send(&m_lora_app_data, LMH_UNCONFIRMED_MSG);
-	
 	// Reset the last message counts to 0
 	last_message_counts = 0;
 
