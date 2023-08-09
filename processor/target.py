@@ -97,6 +97,28 @@ class target:
                         "name": "significantEvent",
                         "displayString": "Notify me of any problems"
                     },
+                    "flowRate": {
+                        "type": "uiVariable",
+                        "name": "flowRate",
+                        "displayString": "Counts",
+                        "varType": "float",
+                        "decPrecision": 1,
+                    },
+                    "totalLitres": {
+                        "type": "uiVariable",
+                        "name": "totalLitres",
+                        "displayString": "Counts",
+                        "varType": "float",
+                        "decPrecision": 1,
+                    },
+                    "lastTimeNonZeroUpdate": {
+                        "type": "uiHiddenValue",
+                        "name": "lastTimeNonZeroUpdate"
+                    },
+                    "eventZeroCounts": {
+                        "type": "uiHiddenValue",
+                        "name": "eventZeroCounts"
+                    },
                     "level": {
                         "type": "uiVariable",
                         "name": "level",
@@ -108,20 +130,20 @@ class target:
                             {
                                 "label" : "Low",
                                 "min" : 0,
-                                "max" : 40,
+                                "max" : 20,
                                 "colour" : "yellow",
                                 "showOnGraph" : True
                             },
                             {
                                 "label" : "Half",
-                                "min" : 40,
-                                "max" : 80,
+                                "min" : 20,
+                                "max" : 70,
                                 "colour" : "blue",
                                 "showOnGraph" : True
                             },
                             {
                                 "label" : "Full",
-                                "min" : 80,
+                                "min" : 70,
                                 "max" : 100,
                                 "colour" : "green",
                                 "showOnGraph" : True
@@ -193,6 +215,20 @@ class target:
                         "name": "details_submodule",
                         "displayString": "Details",
                         "children": {
+                            "resetAfter": {
+                                "type": "uiFloatParam",
+                                "name": "resetAfter",
+                                "displayString": "Clear event after (hours)",
+                                "min": 0,
+                                "max": 999
+                            },
+                            "mmPerCount": {
+                                "type": "uiFloatParam",
+                                "name": "mmPerCount",
+                                "displayString": "mm per tip (mm)",
+                                "min": 0.001,
+                                "max": 10
+                            },
                             "tankType": {
                                 "type": "uiStateCommand",
                                 "name": "tankType",
@@ -273,6 +309,21 @@ class target:
                                 "varType": "float",
                                 "decPrecision": 1
                             },
+                            "rawCount": {
+                                "type": "uiVariable",
+                                "name": "rawCount",
+                                "displayString": "Last Raw Count",
+                                "varType": "float",
+                                "decPrecision": 1
+                            },
+                            "rawCountTotal": {
+                                "type": "uiVariable",
+                                "name": "rawCountTotal",
+                                "displayString": "Raw Count Total",
+                                "varType": "float",
+                                "decPrecision": 1
+                            },
+
                             "rawBattery": {
                                 "type": "uiVariable",
                                 "name": "rawBattery",
@@ -422,11 +473,47 @@ class target:
             h = input1_percentage_level
             input1_percentage_level = (math.acos((r-h)/r)*(r*r)) - ((r-h)*math.sqrt(2*r*h-(h*h)))
 
+
+        count_reading_1 = None
+        try:
+            count_reading_1 = state_obj['state']['children']['details_submodule']['children']['lastCounts']['currentValue']
+        except Exception as e:
+            self.add_to_log("Could not get count raw reading - " + str(e))
+
+        sleep_time = None
+        try:
+            sleep_time = state_obj['state']['children']['node_connection_info']['connectionPeriod']
+        except Exception as e:
+            self.add_to_log("Could not get sleep_time reading - " + str(e))
+        
+        flow_rate_reading = None
+        if count_reading_1 is not None and sleep_time is not None:
+            flow_rate_reading = (count_reading_1 * 10) / (sleep_time / 60)
+
+        total_count_reading_1 = None
+        try:
+            total_count_reading_1 = state_obj['state']['children']['details_submodule']['children']['totalCounts']['currentValue']
+        except Exception as e:
+            self.add_to_log("Could not get total count raw reading - " + str(e))
+
+        total_litres = None
+        if total_count_reading_1 is not None:
+            total_litres = total_count_reading_1 * 10
+        # count_total_processed = None
+        # if total_count_reading_1 is not None:
+        #     count_total_processed = int( total_count_reading_1 * 10 )
+
         msg_obj = {
             "state" : {
                 "children" : {
                     "level" : {
                         "currentValue" : input1_percentage_level
+                    },
+                    "flowRate" : {
+                        "currentValue" : flow_rate_reading
+                    },
+                    "totalLitres" : {
+                        "currentValue" : total_litres
                     },
                     "batteryLevel" : {
                         "currentValue" : batt_percent
@@ -438,7 +525,13 @@ class target:
                             },
                             "rawlevel_processed" : {
                                 "currentValue" : input1_processed
-                            }
+                            },
+                            "rawCount" : {
+                                "currentValue" : count_reading_1
+                            },
+                            "rawCountTotal" : {
+                                "currentValue" : total_count_reading_1
+                            },
                         }
                     }
                 }

@@ -523,29 +523,30 @@ bool send_periodic_lora_frame(void)
     int current_sensor_payload = current_sensor * 1000;
     
 	MYLOG("APP", "--------Total Counts------- =  %u", total_counts);
-	MYLOG("APP", "--Count Senor This Message-- =  %u", last_message_counts);
+	MYLOG("APP", "-------Counts Payload------ =  %u", last_message_counts);
 	MYLOG("APP", "-------Current Sensor------ =  %f", current_sensor);
 	MYLOG("APP", "--Current Sensor Payload--- =  %d", current_sensor_payload);
 	MYLOG("APP", "-----Batt Voltage (mV)----- =  %d", vbat_mv);
-	MYLOG("APP", "------Batt Level (Percent)------- =  %d", vbat_per);
+	MYLOG("APP", "---Batt Level (Percent)---- =  %d", vbat_per);
 	
 
 	// Compile the lora packet
 	uint8_t m_lora_app_data_buffer[64]; // Max 64 bytes long
 
 	uint32_t buffSize = 0;
-	m_lora_app_data_buffer[buffSize++] = (total_counts >> 24) & 0xFF;
-	m_lora_app_data_buffer[buffSize++] = (total_counts >> 16) & 0xFF;
-	m_lora_app_data_buffer[buffSize++] = (total_counts >> 8) & 0xFF;
-	m_lora_app_data_buffer[buffSize++] = (total_counts) & 0xFF;
-	m_lora_app_data_buffer[buffSize++] = highByte(current_sensor_payload);
-	m_lora_app_data_buffer[buffSize++] = lowByte(current_sensor_payload);
-	m_lora_app_data_buffer[buffSize++] = 0; // Reserved for second sensor
-	m_lora_app_data_buffer[buffSize++] = 0; // Reserved for second sensor
-	m_lora_app_data_buffer[buffSize++] = vbat_mv / 20;
-	m_lora_app_data_buffer[buffSize++] = highByte(sleep_time / 1000);
-	m_lora_app_data_buffer[buffSize++] = lowByte(sleep_time / 1000);
-	m_lora_app_data_buffer[buffSize++] = burst_mode_counter;
+	
+	m_lora_app_data_buffer[buffSize++] = highByte(current_sensor_payload); //0
+	m_lora_app_data_buffer[buffSize++] = lowByte(current_sensor_payload);  //1
+	m_lora_app_data_buffer[buffSize++] = highByte(last_message_counts);    //2
+	m_lora_app_data_buffer[buffSize++] = lowByte(last_message_counts);  //3
+	m_lora_app_data_buffer[buffSize++] = vbat_mv / 20;                     //4
+	m_lora_app_data_buffer[buffSize++] = highByte(sleep_time / 1000);      //5
+	m_lora_app_data_buffer[buffSize++] = lowByte(sleep_time / 1000);       //6
+	m_lora_app_data_buffer[buffSize++] = burst_mode_counter;			   //7
+	m_lora_app_data_buffer[buffSize++] = (total_counts >> 24) & 0xFF;      //8
+	m_lora_app_data_buffer[buffSize++] = (total_counts >> 16) & 0xFF;      //9
+	m_lora_app_data_buffer[buffSize++] = (total_counts >> 8) & 0xFF;       //10
+	m_lora_app_data_buffer[buffSize++] = (total_counts) & 0xFF;            //11
 	// m_lora_app_data_buffer[buffSize++] = vbat_per;
 	
 	//  m_lora_app_data_buffer[buffSize++] = 'l';
@@ -556,6 +557,9 @@ bool send_periodic_lora_frame(void)
 	m_lora_app_data.port = 2;
 
 	lmh_error_status error = lmh_send(&m_lora_app_data, LMH_UNCONFIRMED_MSG);
+	
+	// Reset the last message counts to 0
+	last_message_counts = 0;
 
 	MYLOG("APP", "Packet Sent");
 	return (error == 0);
