@@ -281,7 +281,7 @@ void app_event_handler(void)
 	}
 
 	// Check if PIR triggered event
-	if ((g_task_event_type & PIR_TRIGGER)) == PIR_TRIGGER {
+	if ((g_task_event_type & PIR_TRIGGER) == PIR_TRIGGER) {
 		g_task_event_type &= N_PIR_TRIGGER;
 		MYLOG("APP", "PIR triggered event");
 
