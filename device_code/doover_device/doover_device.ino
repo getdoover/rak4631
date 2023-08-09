@@ -8,7 +8,6 @@
 */
 
 // Example 
-// Testing
 
 #include <Arduino.h>
 /** Add you required includes after Arduino.h */
@@ -61,6 +60,10 @@
 #define SW_VERSION_2 0 // minor version increase on API change / backward compatible
 #define SW_VERSION_3 0 // patch version increase on bugfix, no affect on API
 
+/** Application events */
+#define PIR_TRIGGER   0b0000000000100000
+#define N_PIR_TRIGGER 0b1111111111011111
+
 /**
    Optional hard-coded LoRaWAN credentials for OTAA and ABP.
    It is strongly recommended to avoid duplicated node credentials
@@ -87,15 +90,24 @@ bool init_app(void);
 void app_event_handler(void);
 void ble_data_handler(void) __attribute__((weak));
 void lora_data_handler(void);
+void pin_change_triggered(void)
 bool send_periodic_lora_frame(void);
 
 
 /** Application stuff */
+/** Burst Mode */
 uint32_t burst_mode_sleep_time = 30 * 1000; // 30 seconds
 uint32_t burst_mode_counter = 20;
 
+/** Sleep Cycle */
 uint32_t default_sleep_time = 10 * 60 * 1000; // 10 minutes
 uint32_t sleep_time = burst_mode_sleep_time;
+
+/** Counter */
+time_t time_change_interrupt = millis();
+//uint64_t total_counts = 0;
+uint32_t total_counts = 0;
+uint32_t last_message_counts = 0;
 
 
 // Battery Voltage
@@ -192,7 +204,30 @@ void setup_app(void)
 bool init_app(void)
 {
 	MYLOG("APP", "init_app");
+
+	// Setup the pin and interrupt for tipping spoon counter
+	pinMode(WB_IO2, INPUT_PULLDOWN);
+  	attachInterrupt(WB_IO2, pin_change_triggered, RISING);
+
 	return true;
+}
+
+void pin_change_triggered(void){
+  noInterrupts();
+//  MYLOG("APP", "Rising Interrupt %u", millis());
+  // Only trigger if has been high for more than 250ms, and is now low
+  bool run_task = false;
+  if ((digitalRead(WB_IO2) == HIGH) && (millis() - time_change_interrupt > 250)){
+    run_task=true;
+    time_change_interrupt = millis();
+  }
+  if ( run_task ){
+  	// Define the event type
+  	g_task_event_type |= PIR_TRIGGER;
+  	// Wake up the handler, it will check g_task_event_type and know that he has to handle an PIR alarm.
+  	xSemaphoreGiveFromISR(g_task_sem, pdFALSE);
+  }
+  interrupts();
 }
 
 /**
@@ -243,6 +278,18 @@ void app_event_handler(void)
 			// 	break;
 			// }
 		}
+	}
+
+	// Check if PIR triggered event
+	if ((g_task_event_type & PIR_TRIGGER)) == PIR_TRIGGER {
+		g_task_event_type &= N_PIR_TRIGGER;
+		MYLOG("APP", "PIR triggered event");
+
+		total_counts += 1;
+		last_message_counts += 1;
+
+		MYLOG("APP", "Total Count = %u", total_counts);
+		MYLOG("APP", "Last Count = %u", last_message_counts);
 	}
 }
 
@@ -475,6 +522,8 @@ bool send_periodic_lora_frame(void)
     current_sensor = voltage_ain / 149.9 * 1000;    //WisBlock RAK5801 I=U/149.9\*1000 (mA)
     int current_sensor_payload = current_sensor * 1000;
     
+	MYLOG("APP", "--------Total Counts------- =  %u", total_counts);
+	MYLOG("APP", "--Count Senor This Message-- =  %u", last_message_counts);
 	MYLOG("APP", "-------Current Sensor------ =  %f", current_sensor);
 	MYLOG("APP", "--Current Sensor Payload--- =  %d", current_sensor_payload);
 	MYLOG("APP", "-----Batt Voltage (mV)----- =  %d", vbat_mv);
@@ -485,6 +534,10 @@ bool send_periodic_lora_frame(void)
 	uint8_t m_lora_app_data_buffer[64]; // Max 64 bytes long
 
 	uint32_t buffSize = 0;
+	m_lora_app_data_buffer[buffSize++] = (total_counts >> 24) & 0xFF;
+	m_lora_app_data_buffer[buffSize++] = (total_counts >> 16) & 0xFF;
+	m_lora_app_data_buffer[buffSize++] = (total_counts >> 8) & 0xFF;
+	m_lora_app_data_buffer[buffSize++] = (total_counts) & 0xFF;
 	m_lora_app_data_buffer[buffSize++] = highByte(current_sensor_payload);
 	m_lora_app_data_buffer[buffSize++] = lowByte(current_sensor_payload);
 	m_lora_app_data_buffer[buffSize++] = 0; // Reserved for second sensor
