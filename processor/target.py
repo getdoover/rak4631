@@ -596,6 +596,12 @@ class target:
             flow_rate_reading = (count_reading_1 * 10) / (sleep_time / 60)
 
         dailyLitresPumped = None
+        dailyConsumption = None
+        IntervalConsumptionLitres = None
+        IntervalConsumptionRate = None
+        yesterdayConsumption = None
+        yesterdayLitresPumped = None
+
         
         prev_total_count = self.get_previous_level(state_channel, "rawCountTotal", details_submodule=True)
         if prev_total_count is None:
@@ -613,7 +619,7 @@ class target:
         
         if prev_total_count > total_count_reading_1:
             total_count_reading_1+=prev_total_count
-        
+
         if prev_total_count is not None and total_count_reading_1 is not None and prev_dailyLitresPumped is not None:
             if dt.datetime.utcnow().timestamp() > refresh_time:
                 refresh_time = self.get_refresh_time(reset_time)
@@ -624,9 +630,7 @@ class target:
 
             intervalLitresPumped = ((total_count_reading_1 - prev_total_count)*10)
             dailyLitresPumped = intervalLitresPumped + prev_dailyLitresPumped
-            IntervalConsumptionLitres = None
-            IntervalConsumptionRate = None
-
+        
             if tank_diameter is not None and level_difference is not None and intervalLitresPumped is not None:
                 IntervalConsumptionLitres = self.calc_water_consumption(level_difference, tank_diameter, intervalLitresPumped)
                 dailyConsumption = IntervalConsumptionLitres + prev_dailyConsumption
