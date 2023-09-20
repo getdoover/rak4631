@@ -854,7 +854,7 @@ class target:
             i = i + 1
 
         if prev_level is None:
-            self.add_to_log("Could not get previous level - " + str(e))
+            self.add_to_log("Could not get previous level - " + str(key))
         
         return prev_level 
 
