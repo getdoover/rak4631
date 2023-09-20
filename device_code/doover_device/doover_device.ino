@@ -506,7 +506,7 @@ bool send_periodic_lora_frame(void)
 	/* WisBLOCK 5801 Power On*/
 	pinMode(WB_IO1, OUTPUT);
 	digitalWrite(WB_IO1, HIGH);
-	delay(500);
+	delay(3000);
 	/* WisBLOCK 5801 Power On*/
 
 	// Take 10 readings, then get the average

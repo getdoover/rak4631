@@ -2,7 +2,7 @@
 from operator import truediv
 import os, traceback, sys, time, json, math
 from signal import signal
-
+import datetime as dt
 
 ## This is the definition for a tiny lambda function
 ## Which is run in response to messages processed in Doover's 'Channels' system
@@ -80,7 +80,6 @@ class target:
 
     def deploy(self):
         ## Run any deployment code here
-        
         ## Get the deployment channel
         ui_state_channel = self.cli.get_channel(
             channel_name="ui_state",
@@ -96,28 +95,6 @@ class target:
                         "type": "uiAlertStream",
                         "name": "significantEvent",
                         "displayString": "Notify me of any problems"
-                    },
-                    "flowRate": {
-                        "type": "uiVariable",
-                        "name": "flowRate",
-                        "displayString": "Flow Rate (L/min)",
-                        "varType": "float",
-                        "decPrecision": 1,
-                    },
-                    "totalLitres": {
-                        "type": "uiVariable",
-                        "name": "totalLitres",
-                        "displayString": "Total Litres (L)",
-                        "varType": "float",
-                        "decPrecision": 1,
-                    },
-                    "lastTimeNonZeroUpdate": {
-                        "type": "uiHiddenValue",
-                        "name": "lastTimeNonZeroUpdate"
-                    },
-                    "eventZeroCounts": {
-                        "type": "uiHiddenValue",
-                        "name": "eventZeroCounts"
                     },
                     "level": {
                         "type": "uiVariable",
@@ -150,66 +127,81 @@ class target:
                             }
                         ]
                     },
-                    "batteryLevel": {
+                    "dailyConsumption": {
                         "type": "uiVariable",
-                        "name": "batteryLevel",
-                        "displayString": "Battery (%)",
+                        "name": "dailyConsumption",
+                        "displayString": "Consumption Today (L)",
                         "varType": "float",
-                        "decPrecision": 0,
-                        "ranges": [
-                            {
-                                "label" : "Low",
-                                "min" : 0,
-                                "max" : 30,
-                                "colour" : "yellow",
-                                "showOnGraph" : True
-                            },
-                            {
-                                "label" : "Half",
-                                "min" : 30,
-                                "max" : 80,
-                                "colour" : "blue",
-                                "showOnGraph" : True
-                            },
-                            {
-                                "label" : "Full",
-                                "min" : 80,
-                                "max" : 100,
-                                "colour" : "green",
-                                "showOnGraph" : True
-                            }
-                        ]
+                        "decPrecision": 1,
                     },
-                    "signalStrength": {
+                    "dailyLitresPumped": {
                         "type": "uiVariable",
-                        "name": "signalStrength",
-                        "displayString": "Signal Strength (%)",
+                        "name": "dailyLitresPumped",
+                        "displayString": "Water Pumped Today (L)",
                         "varType": "float",
-                        "decPrecision": 0,
-                        "ranges": [
-                            {
-                                "label" : "Low",
-                                "min" : 0,
-                                "max" : 30,
-                                "colour" : "yellow",
-                                "showOnGraph" : True
-                            },
-                            {
-                                "label" : "Ok",
-                                "min" : 30,
-                                "max" : 60,
-                                "colour" : "blue",
-                                "showOnGraph" : True
-                            },
-                            {
-                                "label" : "Strong",
-                                "min" : 60,
-                                "max" : 100,
-                                "colour" : "green",
-                                "showOnGraph" : True
-                            }
-                        ]
+                        "decPrecision": 1,
                     },
+                    "flowRate": {
+                        "type": "uiVariable",
+                        "name": "flowRate",
+                        "displayString": "Current Flow Rate (L/min)",
+                        "varType": "float",
+                        "decPrecision": 1,
+                    },
+                    "lastTimeNonZeroUpdate": {
+                        "type": "uiHiddenValue",
+                        "name": "lastTimeNonZeroUpdate"
+                    },
+                    "eventZeroCounts": {
+                        "type": "uiHiddenValue",
+                        "name": "eventZeroCounts"
+                    },
+                    "resetDailyValuesTime": {
+                        "type": "uiHiddenValue",
+                        "name": "resetDailyValuesTime"
+                    },
+                     "consumption_submodule": {
+                        "type": "uiSubmodule",
+                        "name": "Consumption Data",
+                        "displayString": "Details",
+                        "children": {
+                            "IntervalConsumptionRate": {
+                                "type": "uiVariable",
+                                "name": "IntervalConsumptionRate", 
+                                "displayString": "Interval Consumption Rate (L/min)",
+                                "varType": "float",
+                                "decPrecision": 0,
+                            },
+                            "IntervalConsumptionLitres": {
+                                "type": "uiVariable",
+                                "name": "IntervalConsumptionLitres", 
+                                "displayString": "Interval Consumption Volume (L)",
+                                "varType": "float",
+                                "decPrecision": 0,
+                            },
+                            "yesterdayConsumption": {
+                                "type": "uiVariable",
+                                "name": "yesterdayConsumption", 
+                                "displayString": "Daily Consumption (L)",
+                                "varType": "float",
+                                "decPrecision": 0,
+                            },
+                            "yesterdayLitresPumped": {
+                                "type": "uiVariable",
+                                "name": "yesterdayLitresPumped", 
+                                "displayString": "Litres Pumped Yesterday (L)",
+                                "varType": "float",
+                                "decPrecision": 0,
+                            },
+                            "interval": {
+                                "type": "uiVariable",
+                                "name": "interval", 
+                                "displayString": "Interval (mins)",
+                                "varType": "float",
+                                "decPrecision": 0,
+                            },
+                        }
+                     },
                     "details_submodule": {
                         "type": "uiSubmodule",
                         "name": "details_submodule",
@@ -253,6 +245,13 @@ class target:
                                 "min": 0,
                                 "max": 999
                             },
+                            "tankDiameter": {
+                                "type": "uiFloatParam",
+                                "name": "tankDiameter",
+                                "displayString": "Tank Diameter (cm)",
+                                "min": 0,
+                                "max": 2000
+                            },
                             "inputLowLevel": {
                                 "type": "uiFloatParam",
                                 "name": "inputLowLevel",
@@ -294,6 +293,13 @@ class target:
                                 "displayString": "Burst Mode",
                                 "colour": "blue",
                                 "requiresConfirm": True
+                            },
+                            "totalLitres": {
+                                "type": "uiVariable",
+                                "name": "totalLitres",
+                                "displayString": "Total Litres (L)",
+                                "varType": "float",
+                                "decPrecision": 1,
                             },
                             "rawlevel": {
                                 "type": "uiVariable",
@@ -348,7 +354,67 @@ class target:
                                 "name": "lastUsedGateway",
                                 "displayString": "Lora Gateway",
                                 "varType": "text"
-                            }
+                            },
+                            "batteryLevel": {
+                                "type": "uiVariable",
+                                "name": "batteryLevel",
+                                "displayString": "Battery (%)",
+                                "varType": "float",
+                                "decPrecision": 0,
+                                "ranges": [
+                                    {
+                                        "label" : "Low",
+                                        "min" : 0,
+                                        "max" : 30,
+                                        "colour" : "yellow",
+                                        "showOnGraph" : True
+                                    },
+                                    {
+                                        "label" : "Half",
+                                        "min" : 30,
+                                        "max" : 80,
+                                        "colour" : "blue",
+                                        "showOnGraph" : True
+                                    },
+                                    {
+                                        "label" : "Full",
+                                        "min" : 80,
+                                        "max" : 100,
+                                        "colour" : "green",
+                                        "showOnGraph" : True
+                                    }
+                                ]
+                            },
+                            "signalStrength": {
+                                "type": "uiVariable",
+                                "name": "signalStrength",
+                                "displayString": "Signal Strength (%)",
+                                "varType": "float",
+                                "decPrecision": 0,
+                                "ranges": [
+                                    {
+                                        "label" : "Low",
+                                        "min" : 0,
+                                        "max" : 30,
+                                        "colour" : "yellow",
+                                        "showOnGraph" : True
+                                    },
+                                    {
+                                        "label" : "Ok",
+                                        "min" : 30,
+                                        "max" : 60,
+                                        "colour" : "blue",
+                                        "showOnGraph" : True
+                                    },
+                                    {
+                                        "label" : "Strong",
+                                        "min" : 60,
+                                        "max" : 100,
+                                        "colour" : "green",
+                                        "showOnGraph" : True
+                                    }
+                                ]
+                            },
                         }
                     },
                     "node_connection_info": {
@@ -415,11 +481,30 @@ class target:
                 msg_str=self._log
             )
 
+    def calc_water_consumption(self, level_difference, tank_diameter_cm, litres_pumped):
+        lev_diff_vol_L = level_difference*(355/113)*((tank_diameter_cm/200)**2)/1000
+        return lev_diff_vol_L + litres_pumped
+
+    
+    def get_refresh_time(self, reset_time):
+        return (dt.datetime.utcnow()+dt.timedelta(days=1)).replace(hour=reset_time+10, minute=0, second=0, microsecond=0).timestamp()
+
     ## Compute output values from raw values
     def compute_output_levels(self, cmds_channel, state_channel):
 
         state_obj = state_channel.get_aggregate()
         cmds_obj = cmds_channel.get_aggregate()
+
+        reset_time = 0 #time in 24hour time and must be an integer
+        refresh_time = None
+
+        try:
+            refresh_time = state_obj['state']['children']['resetDailyValuesTime']
+        except Exception as e:
+            self.add_to_log("Could not get refresh time - " + str(e))
+        if refresh_time is None:
+            self.add_to_log("Initializing refresh time - " + str(e))
+            refresh_time = self.get_refresh_time(reset_time)
 
         batt_percent = None
         try:
@@ -459,6 +544,12 @@ class target:
         except Exception as e:
             self.add_to_log("Could not get sensor scaling cal - " + str(e))
 
+        try:
+            tank_diameter = cmds_obj['cmds']['tankDiameter']
+        except Exception as e:
+            self.add_to_log("Could not get tank diameter - " + str(e))
+
+
         input1_processed = None
         input1_percentage_level = None
         if raw_reading_1 is not None and raw_reading_1 > 3.8:
@@ -473,7 +564,6 @@ class target:
             h = input1_percentage_level
             input1_percentage_level = (math.acos((r-h)/r)*(r*r)) - ((r-h)*math.sqrt(2*r*h-(h*h)))
 
-
         count_reading_1 = None
         try:
             count_reading_1 = state_obj['state']['children']['details_submodule']['children']['lastCounts']['currentValue']
@@ -485,16 +575,57 @@ class target:
             sleep_time = state_obj['state']['children']['node_connection_info']['connectionPeriod']
         except Exception as e:
             self.add_to_log("Could not get sleep_time reading - " + str(e))
-        
-        flow_rate_reading = None
-        if count_reading_1 is not None and sleep_time is not None:
-            flow_rate_reading = (count_reading_1 * 10) / (sleep_time / 60)
 
         total_count_reading_1 = None
         try:
             total_count_reading_1 = state_obj['state']['children']['details_submodule']['children']['totalCounts']['currentValue']
         except Exception as e:
             self.add_to_log("Could not get total count raw reading - " + str(e))
+
+        level_difference = None
+        try:
+            prev_level = self.get_previous_level(state_channel, "level")
+            if prev_level is not None:
+                level_difference = input1_percentage_level - prev_level
+        except Exception as e:
+            self.add_to_log("Could not get Level difference- " + str(e))
+
+        flow_rate_reading = None
+        if count_reading_1 is not None and sleep_time is not None:
+            flow_rate_reading = (count_reading_1 * 10) / (sleep_time / 60)
+
+        dailyLitresPumped = None
+        
+        prev_total_count = self.get_previous_level(state_channel, "rawCountTotal", details_submodule=True)
+
+        prev_dailyLitresPumped = self.get_previous_level(state_channel, "dailyLitresPumped")
+        if prev_dailyLitresPumped is None:
+            prev_dailyLitresPumped = 0
+
+        prev_dailyConsumption = self.get_previous_level(state_channel, "dailyConsumption")
+        if prev_dailyConsumption is None:
+            prev_dailyConsumption = 0
+        
+        if prev_total_count > total_count_reading_1:
+            total_count_reading_1+=prev_total_count
+        
+        if prev_total_count is not None and total_count_reading_1 is not None and prev_dailyLitresPumped is not None:
+            if dt.datetime.utcnow().timestamp() > refresh_time:
+                refresh_time = self.get_refresh_time(reset_time)
+                yesterdayLitresPumped = prev_dailyLitresPumped
+                yesterdayConsumption = prev_dailyConsumption
+                prev_dailyLitresPumped = 0
+                prev_dailyConsumption = 0
+
+            intervalLitresPumped = ((total_count_reading_1 - prev_total_count)*10)
+            dailyLitresPumped = intervalLitresPumped + prev_dailyLitresPumped
+            IntervalConsumptionLitres = None
+            IntervalConsumptionRate = None
+
+            if tank_diameter is not None and level_difference is not None and intervalLitresPumped is not None:
+                IntervalConsumptionLitres = self.calc_water_consumption(level_difference, tank_diameter, intervalLitresPumped)
+                dailyConsumption = IntervalConsumptionLitres + prev_dailyConsumption
+                IntervalConsumptionRate = IntervalConsumptionLitres / (sleep_time / 60)
 
         total_litres = None
         if total_count_reading_1 is not None:
@@ -509,14 +640,36 @@ class target:
                     "level" : {
                         "currentValue" : input1_percentage_level
                     },
+                    "dailyConsumption" :{
+                        "currentValue" : dailyConsumption
+                    },
+                    "dailyLitresPumped" :{
+                        "currentValue" : dailyLitresPumped
+                    },
                     "flowRate" : {
                         "currentValue" : flow_rate_reading
                     },
-                    "totalLitres" : {
-                        "currentValue" : total_litres
+                    "resetDailyValuesTime" : {
+                        "currentValue" : refresh_time
                     },
-                    "batteryLevel" : {
-                        "currentValue" : batt_percent
+                    "consumption_submodule" : {
+                        "children" : {
+                            "IntervalConsumptionRate": {
+                                "currentValue" : IntervalConsumptionRate
+                            },
+                            "IntervalConsumptionLitres": {
+                                "currentValue" : IntervalConsumptionLitres
+                            },
+                            "yesterdayConsumption": {
+                                "currentValue" : yesterdayConsumption
+                            },
+                            "yesterdayLitresPumped": {
+                                "currentValue" : yesterdayLitresPumped
+                            },
+                            "interval": {
+                                "currentValue" : sleep_time / 60
+                            },
+                        },
                     },
                     "details_submodule" : {
                         "children" : {
@@ -531,6 +684,12 @@ class target:
                             },
                             "rawCountTotal" : {
                                 "currentValue" : total_count_reading_1
+                            },
+                            "levelDifference":{
+                                "currentValue" : level_difference
+                            },
+                            "totalLitres" : {
+                                "currentValue" : total_litres
                             },
                         }
                     }
@@ -565,7 +724,7 @@ class target:
         except Exception as e: self.add_to_log("Could not get level alarm")
 
         battery_alarm = None
-        try: battery_alarm = cmds_obj['cmds']['battAlarmLevel']
+        try: battery_alarm = float(cmds_obj['cmds']['battAlarmLevel'])
         except Exception as e: self.add_to_log("Could not get battery alarm")
         
         state_obj = state_channel.get_aggregate()
@@ -669,7 +828,7 @@ class target:
             save_log=False
         )
 
-    def get_previous_level(self, state_channel, key):
+    def get_previous_level(self, state_channel, key, details_submodule=False):
         state_messages = state_channel.get_messages()
 
         ## Search through the last few messages to find the last battery level
@@ -685,7 +844,10 @@ class target:
         while prev_level is None and i < 10 and i < len(state_messages):
             try:
                 prev_state_payload = json.loads( state_messages[i].get_payload() )
-                prev_level = prev_state_payload['state']['children'][key]['currentValue']
+                if details_submodule:
+                    prev_level = prev_state_payload['state']['children']['details_submodule']['children'][key]['currentValue']
+                else:
+                    prev_level = prev_state_payload['state']['children'][key]['currentValue']
                 self.add_to_log("Found previous level of " + str(prev_level) + ", " + str(i) + " messages ago : " + str(state_messages[i].message_id))
             except Exception as e:
                 pass
