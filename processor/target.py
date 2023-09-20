@@ -620,6 +620,10 @@ class target:
         if prev_total_count > total_count_reading_1:
             total_count_reading_1+=prev_total_count
 
+        print("prev_total_count", prev_total_count)
+        print("total_count_reading_1", total_count_reading_1)
+        print("prev_dailyLitresPumped", prev_dailyLitresPumped)
+
         if prev_total_count is not None and total_count_reading_1 is not None and prev_dailyLitresPumped is not None:
             if dt.datetime.utcnow().timestamp() > refresh_time:
                 refresh_time = self.get_refresh_time(reset_time)
@@ -630,7 +634,10 @@ class target:
 
             intervalLitresPumped = ((total_count_reading_1 - prev_total_count)*10)
             dailyLitresPumped = intervalLitresPumped + prev_dailyLitresPumped
-        
+
+            print("intervalLitresPumped", intervalLitresPumped)
+            print("tank_diameter", tank_diameter)
+            print("level_difference", level_difference)
             if tank_diameter is not None and level_difference is not None and intervalLitresPumped is not None:
                 IntervalConsumptionLitres = self.calc_water_consumption(level_difference, tank_diameter, intervalLitresPumped)
                 dailyConsumption = IntervalConsumptionLitres + prev_dailyConsumption
