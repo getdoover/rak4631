@@ -163,7 +163,7 @@ class target:
                      "consumption_submodule": {
                         "type": "uiSubmodule",
                         "name": "Consumption Data",
-                        "displayString": "Details",
+                        "displayString": "Consumption Data",
                         "children": {
                             "IntervalConsumptionRate": {
                                 "type": "uiVariable",
