@@ -499,10 +499,10 @@ class target:
         refresh_time = None
 
         try:
-            refresh_time = state_obj['state']['children']['resetDailyValuesTime']
+            refresh_time = state_obj['state']['children']['resetDailyValuesTime']["currentValue"]
         except Exception as e:
             self.add_to_log("Could not get refresh time - " + str(e))
-        if refresh_time is None:
+        if refresh_time is None or 0 or '':
             self.add_to_log("Initializing refresh time - " + str(e))
             refresh_time = self.get_refresh_time(reset_time)
 
