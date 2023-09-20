@@ -503,7 +503,7 @@ class target:
         except Exception as e:
             self.add_to_log("Could not get refresh time - " + str(e))
         if refresh_time is None or 0 or '':
-            self.add_to_log("Initializing refresh time - " + str(e))
+            self.add_to_log("Initializing refresh time")
             refresh_time = self.get_refresh_time(reset_time)
 
         batt_percent = None
