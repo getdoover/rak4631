@@ -544,6 +544,7 @@ class target:
         except Exception as e:
             self.add_to_log("Could not get sensor scaling cal - " + str(e))
 
+        tank_diameter = None
         try:
             tank_diameter = cmds_obj['cmds']['tankDiameter']
         except Exception as e:
