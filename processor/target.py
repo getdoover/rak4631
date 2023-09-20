@@ -483,7 +483,8 @@ class target:
 
     def calc_water_consumption(self, level_difference, tank_diameter_cm, litres_pumped):
         lev_diff_vol_L = level_difference*(355/113)*((tank_diameter_cm/200)**2)/1000
-        return lev_diff_vol_L + litres_pumped
+        consumption  = lev_diff_vol_L - litres_pumped
+        return consumption
 
     
     def get_refresh_time(self, reset_time):
