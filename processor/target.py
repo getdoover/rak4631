@@ -597,6 +597,8 @@ class target:
         dailyLitresPumped = None
         
         prev_total_count = self.get_previous_level(state_channel, "rawCountTotal", details_submodule=True)
+        if prev_total_count is None:
+            prev_total_count = self.get_previous_level(state_channel, "totalCounts")
 
         prev_dailyLitresPumped = self.get_previous_level(state_channel, "dailyLitresPumped")
         if prev_dailyLitresPumped is None:
