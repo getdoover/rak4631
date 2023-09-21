@@ -624,6 +624,9 @@ class target:
         if prev_total_count is not None and total_count_reading_1 is not None and prev_dailyLitresPumped is not None:
             self.add_to_log("refresh time is " + str(refresh_time))
             self.add_to_log("datetime.utcnow().timstamp() " + str(dt.datetime.utcnow().timestamp()))
+            self.add_to_log("prev_dailyLitresPumped " + str(prev_dailyLitresPumped))
+            self.add_to_log("prev_dailyConsumption " + str(prev_dailyConsumption))
+
             if dt.datetime.utcnow().timestamp() > refresh_time:
                 self.add_to_log("resetting daily values")
                 self.add_to_log("yesterdayLitresPumped: " + str(prev_dailyLitresPumped))
@@ -678,12 +681,12 @@ class target:
                             "IntervalConsumptionLitres": {
                                 "currentValue" : IntervalConsumptionLitres
                             },
-                            "yesterdayConsumption": {
-                                "currentValue" : yesterdayConsumption
-                            },
-                            "yesterdayLitresPumped": {
-                                "currentValue" : yesterdayLitresPumped
-                            },
+                            # "yesterdayConsumption": {
+                            #     "currentValue" : yesterdayConsumption
+                            # },
+                            # "yesterdayLitresPumped": {
+                            #     "currentValue" : yesterdayLitresPumped
+                            # },
                             "interval": {
                                 "currentValue" : sleep_time / 60
                             },
@@ -714,6 +717,13 @@ class target:
                 }
             }
         }
+
+        if yesterdayConsumption is not None:
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayConsumption"]["currentValue"] = yesterdayConsumption
+
+        if yesterdayLitresPumped is not None:
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayLitresPumped"]["currentValue"] = yesterdayLitresPumped
+
         state_channel.publish(
             msg_str=json.dumps(msg_obj),
         )
