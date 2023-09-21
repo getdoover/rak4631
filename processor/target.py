@@ -621,12 +621,13 @@ class target:
         if prev_total_count > total_count_reading_1:
             total_count_reading_1+=prev_total_count
 
-        print("prev_total_count", prev_total_count)
-        print("total_count_reading_1", total_count_reading_1)
-        print("prev_dailyLitresPumped", prev_dailyLitresPumped)
-
         if prev_total_count is not None and total_count_reading_1 is not None and prev_dailyLitresPumped is not None:
+            self.add_to_log("refresh time is " + str(refresh_time))
+            self.add_to_log("datetime.utcnow().timstamp() " + str(dt.datetime.utcnow().timestamp()))
             if dt.datetime.utcnow().timestamp() > refresh_time:
+                self.add_to_log("resetting daily values")
+                self.add_to_log("yesterdayLitresPumped: " + str(prev_dailyLitresPumped))
+                self.add_to_log("yesterdayConsumption: " + str(prev_dailyConsumption))
                 refresh_time = self.get_refresh_time(reset_time)
                 yesterdayLitresPumped = prev_dailyLitresPumped
                 yesterdayConsumption = prev_dailyConsumption
