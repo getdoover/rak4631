@@ -719,10 +719,10 @@ class target:
         }
 
         if yesterdayConsumption is not None:
-            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayConsumption"]["currentValue"] = yesterdayConsumption
+            msg_obj["state"]["children"]["consumption_submodule"]["children"].update(yesterdayConsumption = {"currentValue": yesterdayConsumption})
 
         if yesterdayLitresPumped is not None:
-            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayLitresPumped"]["currentValue"] = yesterdayLitresPumped
+            msg_obj["state"]["children"]["consumption_submodule"]["children"].update(yesterdayLitresPumped = {"currentValue": yesterdayLitresPumped})
 
         state_channel.publish(
             msg_str=json.dumps(msg_obj),
