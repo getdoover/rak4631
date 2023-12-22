@@ -480,7 +480,9 @@ class target:
 
     
     def get_daily_time(self, reset_time):
-        return (dt.datetime.utcnow()+dt.timedelta(days=1)).replace(hour=reset_time+10, minute=0, second=0, microsecond=0).timestamp()
+        # if (reset_time + 10) > 23:
+        #     _reset_time = (reset_time + 10)%23
+        return (dt.datetime.utcnow()+dt.timedelta(days=1)).replace(hour=(reset_time+10)%23, minute=0, second=0, microsecond=0).timestamp()
 
     ## Compute output values from raw values
     def compute_output_levels(self, cmds_channel, state_channel):
