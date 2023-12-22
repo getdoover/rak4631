@@ -528,7 +528,7 @@ class target:
         except Exception as e:
             self.add_to_log("Could not get tank type - " + str(e))
 
-        sensor_1_max = 250
+        r = 250
         try:
             sensor_1_max = cmds_obj['cmds']['inputMax']
         except Exception as e:
@@ -556,7 +556,7 @@ class target:
         input1_processed = None
         input1_percentage_level = None
         if raw_reading_1 is not None and raw_reading_1 > 3.8:
-            # if sensor_1_type == "submersibleLevel":
+            # if sensor_1_type == "submersibleLevel"
             input1_processed = int( (raw_reading_1 - 4) * 0.1875 * 1.6 * 100 )
             input1_processed = (input1_processed + sensor_1_zero_cal) * sensor_1_scaling_cal
             input1_percentage_level = round((input1_processed / sensor_1_max) * 100, 1)
@@ -593,7 +593,7 @@ class target:
         todaysConsumption = None
 
         initYesterdayCountTotal = False
-        initYesterdayLevel = False
+        inityesterdayHeight = False
 
         
         yesterdayCountTotal = None
@@ -605,13 +605,13 @@ class target:
             initYesterdayCountTotal = True
 
 
-        yesterdayLevel = None
+        yesterdayHeight = None
         try:
-            yesterdayLevel = state_obj['state']['children']['consumption_submodule']['children']['yesterdayLevel']['currentValue']
+            yesterdayHeight = state_obj['state']['children']['consumption_submodule']['children']['yesterdayHeight']['currentValue']
         except Exception as e:
             self.add_to_log("Could not get yesterday level - " + str(e))
-            yesterdayLevel = input1_percentage_level
-            initYesterdayLevel = True
+            yesterdayHeight = input1_processed
+            inityesterdayHeight = True
 
         yesterdayConsumption = None
         try:
@@ -644,8 +644,8 @@ class target:
             self.add_to_log("todaysLitresPumped " + str(todaysLitresPumped))
             self.add_to_log("++++++++++++++++++++++ DEBUG ++++++++++++++++++++++")
 
-            todaysLevelPercDiff = input1_percentage_level - yesterdayLevel
-            todaysWaterConsumptionFromLevel  = self.calc_water_level_delta(yesterdayLevel, input1_percentage_level, tank_diameter)
+            todaysHeightDiff = yesterdayHeight - input1_processed
+            todaysWaterConsumptionFromLevel  = self.calc_water_level_delta(yesterdayHeight, input1_processed, tank_diameter)
 
             todaysConsumption = todaysLitresPumped + todaysWaterConsumptionFromLevel
             
@@ -679,8 +679,8 @@ class target:
                             "todaysLitresPumped" :{
                                 "currentValue" : todaysLitresPumped
                             },
-                            "todaysLevelPercDiff" :{
-                                "currentValue" : todaysLevelPercDiff
+                            "todaysHeightDiff" :{
+                                "currentValue" : todaysHeightDiff
                             },
                             "todaysWaterConsumptionFromLevel" :{
                                 "currentValue" : todaysWaterConsumptionFromLevel
@@ -730,8 +730,8 @@ class target:
             yesterdayLitresPumped = todaysLitresPumped
             msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayLitresPumped"] = {"currentValue" : yesterdayLitresPumped}
 
-            yesterdayLevel = input1_percentage_level
-            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayLevel"] = {"currentValue" : yesterdayLevel}
+            yesterdayHeight = input1_percentage_level
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayHeight"] = {"currentValue" : yesterdayHeight}
 
             yesterdayWaterConsumptionFromLevel = todaysWaterConsumptionFromLevel
             msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayWaterConsumptionFromLevel"] = {"currentValue" : yesterdayWaterConsumptionFromLevel}
@@ -749,8 +749,8 @@ class target:
 
             self.consumption_report = cons_rep + cons_chg + pmped_yest + lvl_now
         
-        if initYesterdayLevel:
-            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayLevel"] = {"currentValue" : yesterdayLevel}
+        if inityesterdayHeight:
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayHeight"] = {"currentValue" : yesterdayHeight}
 
         if initYesterdayCountTotal:
             msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayCountTotal"] = {"currentValue" : yesterdayCountTotal}
