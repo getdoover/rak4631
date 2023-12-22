@@ -127,26 +127,19 @@ class target:
                             }
                         ]
                     },
-                    "dailyConsumption": {
-                        "type": "uiVariable",
-                        "name": "dailyConsumption",
-                        "displayString": "Consumption Today (L)",
-                        "varType": "float",
-                        "decPrecision": 1,
-                    },
-                    "dailyLitresPumped": {
-                        "type": "uiVariable",
-                        "name": "dailyLitresPumped",
-                        "displayString": "Water Pumped Today (L)",
-                        "varType": "float",
-                        "decPrecision": 1,
-                    },
-                    "flowRate": {
+                     "flowRate": {
                         "type": "uiVariable",
                         "name": "flowRate",
                         "displayString": "Current Flow Rate (L/min)",
                         "varType": "float",
                         "decPrecision": 1,
+                    },
+                    "yesterdayConsumption": {
+                        "type": "uiVariable",
+                        "name": "yesterdayConsumption", 
+                        "displayString": "Yesterdays Consumption (L)",
+                        "varType": "float",
+                        "decPrecision": 0,
                     },
                     "lastTimeNonZeroUpdate": {
                         "type": "uiHiddenValue",
@@ -165,26 +158,19 @@ class target:
                         "name": "Consumption Data",
                         "displayString": "Consumption Data",
                         "children": {
-                            "IntervalConsumptionRate": {
+                            "todaysConsumption": {
                                 "type": "uiVariable",
-                                "name": "IntervalConsumptionRate", 
-                                "displayString": "Interval Consumption Rate (L/min)",
+                                "name": "todaysConsumption",
+                                "displayString": "Consumption Today (L)",
                                 "varType": "float",
-                                "decPrecision": 0,
+                                "decPrecision": 1,
                             },
-                            "IntervalConsumptionLitres": {
+                            "todaysLitresPumped": {
                                 "type": "uiVariable",
-                                "name": "IntervalConsumptionLitres", 
-                                "displayString": "Interval Consumption Volume (L)",
+                                "name": "todaysLitresPumped",
+                                "displayString": "Water Pumped Today (L)",
                                 "varType": "float",
-                                "decPrecision": 0,
-                            },
-                            "yesterdayConsumption": {
-                                "type": "uiVariable",
-                                "name": "yesterdayConsumption", 
-                                "displayString": "Daily Consumption (L)",
-                                "varType": "float",
-                                "decPrecision": 0,
+                                "decPrecision": 1,
                             },
                             "yesterdayLitresPumped": {
                                 "type": "uiVariable",
@@ -193,10 +179,10 @@ class target:
                                 "varType": "float",
                                 "decPrecision": 0,
                             },
-                            "interval": {
+                            "yesterdayConsumption": {
                                 "type": "uiVariable",
-                                "name": "interval", 
-                                "displayString": "Interval (mins)",
+                                "name": "yesterdayConsumption", 
+                                "displayString": "Daily Consumption (L)",
                                 "varType": "float",
                                 "decPrecision": 0,
                             },
@@ -481,13 +467,19 @@ class target:
                 msg_str=self._log
             )
 
-    def calc_water_consumption(self, level_difference, tank_diameter_cm, litres_pumped):
-        lev_diff_vol_L = level_difference*(355/113)*((tank_diameter_cm/200)**2)/1000
-        consumption  = lev_diff_vol_L - litres_pumped
+    def calc_water_level_delta(self, lvl_prev, lvl_now, tank_diameter_cm):
+        ## result in L
+        if lvl_prev is None or lvl_now is None:
+            return None
+        delta = (lvl_prev - lvl_now) * (355/113)*((tank_diameter_cm/200)**2)/1000
+        return delta
+    
+    def calc_water_consumption(self, level_delta, litres_pumped):
+        water_delta = level_delta - litres_pumped
         return consumption
 
     
-    def get_refresh_time(self, reset_time):
+    def get_daily_time(self, reset_time):
         return (dt.datetime.utcnow()+dt.timedelta(days=1)).replace(hour=reset_time+10, minute=0, second=0, microsecond=0).timestamp()
 
     ## Compute output values from raw values
@@ -496,16 +488,25 @@ class target:
         state_obj = state_channel.get_aggregate()
         cmds_obj = cmds_channel.get_aggregate()
 
-        reset_time = 0 #time in 24hour time and must be an integer
-        refresh_time = None
+        reset_time = 7 #time in 24hour time and must be an integer
+        daily_time = None
 
         try:
-            refresh_time = state_obj['state']['children']['resetDailyValuesTime']["currentValue"]
+            eventZeroCounts = state_obj['state']['children']['eventZeroCounts']['currentValue']
+        except Exception as e:
+            eventZeroCounts = None
+            self.add_to_log("Could not get eventZeroCounts - " + str(e))
+
+        
+        try:
+            daily_time = state_obj['state']['children']['resetDailyValuesTime']["currentValue"]
         except Exception as e:
             self.add_to_log("Could not get refresh time - " + str(e))
-        if refresh_time is None or 0 or '':
+        if daily_time is None or 0 or '':
             self.add_to_log("Initializing refresh time")
-            refresh_time = self.get_refresh_time(reset_time)
+            daily_time = self.get_daily_time(reset_time)
+            if eventZeroCounts is not None:
+                eventZeroCounts +=1
 
         batt_percent = None
         try:
@@ -584,70 +585,57 @@ class target:
         except Exception as e:
             self.add_to_log("Could not get total count raw reading - " + str(e))
 
-        level_difference = None
-        try:
-            prev_level = self.get_previous_level(state_channel, "level")
-            if prev_level is not None:
-                level_difference = input1_percentage_level - prev_level
-        except Exception as e:
-            self.add_to_log("Could not get Level difference- " + str(e))
-
         flow_rate_reading = None
         if count_reading_1 is not None and sleep_time is not None:
             flow_rate_reading = (count_reading_1 * 10) / (sleep_time / 60)
 
-        dailyLitresPumped = None
-        dailyConsumption = None
-        IntervalConsumptionLitres = None
-        IntervalConsumptionRate = None
+        todaysLitresPumped = None
+        todaysConsumption = None
+
+        yesterdayCountTotal = None
+        try:
+            yesterdayCountTotal = state_obj['state']['children']['consumption_submodule']['children']['yesterdayCountTotal']['currentValue']
+        except Exception as e:
+            self.add_to_log("Could not get yesterday count total - " + str(e))
+            yesterdayCountTotal = total_count_reading_1
+
+        yesterdayLevel = None
+        try:
+            yesterdayLevel = state_obj['state']['children']['consumption_submodule']['children']['yesterdayLevel']['currentValue']
+        except Exception as e:
+            self.add_to_log("Could not get yesterday level - " + str(e))
+            yesterdayLevel = input1_percentage_level
+
         yesterdayConsumption = None
+        try:
+            yesterdayConsumption = state_obj['state']['children']['yesterdayConsumption']['currentValue']
+        except Exception as e:
+            self.add_to_log("Could not get yesterday consumption - " + str(e))
+
         yesterdayLitresPumped = None
+        try:
+            yesterdayLitresPumped = state_obj['state']['children']['consumption_submodule']['children']['yesterdayLitresPumped']['currentValue']
+        except Exception as e:
+            self.add_to_log("Could not get yesterday litres pumped - " + str(e))
 
         
-        prev_total_count = self.get_previous_level(state_channel, "rawCountTotal", details_submodule=True)
-        if prev_total_count is None:
-            prev_total_count = self.get_previous_level(state_channel, "totalCounts")
-        if prev_total_count is None:
-            prev_total_count = 0
+        yesterdayLevelDifference = None
+        try:
+            yesterdayLevelDifference = state_obj['state']['children']['consumption_submodule']['children']['yesterdayLevelDifference']['currentValue']
+        except Exception as e:
+            self.add_to_log("Could not get yesterday level difference - " + str(e))
 
-        prev_dailyLitresPumped = self.get_previous_level(state_channel, "dailyLitresPumped")
-        if prev_dailyLitresPumped is None:
-            prev_dailyLitresPumped = 0
-
-        prev_dailyConsumption = self.get_previous_level(state_channel, "dailyConsumption")
-        if prev_dailyConsumption is None:
-            prev_dailyConsumption = 0
-        
-        if prev_total_count > total_count_reading_1:
-            total_count_reading_1+=prev_total_count
-
-        if prev_total_count is not None and total_count_reading_1 is not None and prev_dailyLitresPumped is not None:
-            self.add_to_log("refresh time is " + str(refresh_time))
+        if total_count_reading_1 is not None:
+            self.add_to_log("refresh time is " + str(daily_time))
             self.add_to_log("datetime.utcnow().timstamp() " + str(dt.datetime.utcnow().timestamp()))
-            self.add_to_log("prev_dailyLitresPumped " + str(prev_dailyLitresPumped))
-            self.add_to_log("prev_dailyConsumption " + str(prev_dailyConsumption))
 
-            if dt.datetime.utcnow().timestamp() > refresh_time:
-                self.add_to_log("resetting daily values")
-                self.add_to_log("yesterdayLitresPumped: " + str(prev_dailyLitresPumped))
-                self.add_to_log("yesterdayConsumption: " + str(prev_dailyConsumption))
-                refresh_time = self.get_refresh_time(reset_time)
-                yesterdayLitresPumped = prev_dailyLitresPumped
-                yesterdayConsumption = prev_dailyConsumption
-                prev_dailyLitresPumped = 0
-                prev_dailyConsumption = 0
+            
+            todaysLitresPumped = (total_count_reading_1 - yesterdayCountTotal)*10
+            todaysLevelPercDiff = input1_percentage_level - yesterdayLevel
+            todaysLevelDifference  = self.calc_water_level_delta(yesterdayLevel, input1_percentage_level, tank_diameter)
 
-            intervalLitresPumped = ((total_count_reading_1 - prev_total_count)*10)
-            dailyLitresPumped = intervalLitresPumped + prev_dailyLitresPumped
-
-            print("intervalLitresPumped", intervalLitresPumped)
-            print("tank_diameter", tank_diameter)
-            print("level_difference", level_difference)
-            if tank_diameter is not None and level_difference is not None and intervalLitresPumped is not None:
-                IntervalConsumptionLitres = self.calc_water_consumption(level_difference, tank_diameter, intervalLitresPumped)
-                dailyConsumption = IntervalConsumptionLitres + prev_dailyConsumption
-                IntervalConsumptionRate = IntervalConsumptionLitres / (sleep_time / 60)
-
+            todaysConsumption = todaysLitresPumped + todaysLevelDifference
+            
         total_litres = None
         if total_count_reading_1 is not None:
             total_litres = total_count_reading_1 * 10
@@ -661,34 +649,28 @@ class target:
                     "level" : {
                         "currentValue" : input1_percentage_level
                     },
-                    "dailyConsumption" :{
-                        "currentValue" : dailyConsumption
-                    },
-                    "dailyLitresPumped" :{
-                        "currentValue" : dailyLitresPumped
-                    },
                     "flowRate" : {
                         "currentValue" : flow_rate_reading
                     },
                     "resetDailyValuesTime" : {
-                        "currentValue" : refresh_time
+                        "currentValue" : daily_time
+                    },
+                    "eventZeroCounts" : {
+                        "currentValue" : eventZeroCounts
                     },
                     "consumption_submodule" : {
                         "children" : {
-                            "IntervalConsumptionRate": {
-                                "currentValue" : IntervalConsumptionRate
+                            "todaysConsumption" :{
+                                "currentValue" : todaysConsumption
                             },
-                            "IntervalConsumptionLitres": {
-                                "currentValue" : IntervalConsumptionLitres
+                            "todaysLitresPumped" :{
+                                "currentValue" : todaysLitresPumped
                             },
-                            # "yesterdayConsumption": {
-                            #     "currentValue" : yesterdayConsumption
-                            # },
-                            # "yesterdayLitresPumped": {
-                            #     "currentValue" : yesterdayLitresPumped
-                            # },
-                            "interval": {
-                                "currentValue" : sleep_time / 60
+                            "todaysLevelPercDiff" :{
+                                "currentValue" : todaysLevelPercDiff
+                            },
+                            "todaysLitresPumped" :{
+                                "currentValue" : todaysLevelDifference
                             },
                         },
                     },
@@ -706,23 +688,53 @@ class target:
                             "rawCountTotal" : {
                                 "currentValue" : total_count_reading_1
                             },
-                            "levelDifference":{
-                                "currentValue" : level_difference
-                            },
+                            # "levelDifference":{
+                            #     "currentValue" : level_difference
+                            # },
                             "totalLitres" : {
                                 "currentValue" : total_litres
+                            },
+                            "batteryLevel" : {
+                                "currentValue" : batt_percent
                             },
                         }
                     }
                 }
             }
         }
+        #update yesterdays values
+        if dt.datetime.utcnow().timestamp() > daily_time:
+            self.add_to_log("updating yesterdays consumption values")
+            daily_time = self.get_daily_time(reset_time)
 
-        if yesterdayConsumption is not None:
-            msg_obj["state"]["children"]["consumption_submodule"]["children"].update(yesterdayConsumption = {"currentValue": yesterdayConsumption})
+            consumptionPercChange = (todaysConsumption/yesterdayConsumption - 1) * 100
 
-        if yesterdayLitresPumped is not None:
-            msg_obj["state"]["children"]["consumption_submodule"]["children"].update(yesterdayLitresPumped = {"currentValue": yesterdayLitresPumped})
+            yesterdayConsumption = todaysConsumption
+            msg_obj["state"]["children"]["yesterdayConsumption"] = {"currentValue" : yesterdayConsumption}
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayConsumption"] = {"currentValue" : yesterdayConsumption}
+
+            yesterdayLitresPumped = todaysLitresPumped
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayLitresPumped"] = {"currentValue" : yesterdayLitresPumped}
+
+            yesterdayLevel = input1_percentage_level
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayLevel"] = {"currentValue" : yesterdayLevel}
+
+            yesterdayLevelDifference = todaysLevelDifference
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayLevelDifference"] = {"currentValue" : yesterdayLevelDifference}
+
+            yesterdayCount = total_count_reading_1 - yesterdayCountTotal
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayCount"] = {"currentValue" : yesterdayCount}
+
+            yesterdayCountTotal = total_count_reading_1
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayCountTotal"] = {"currentValue" : yesterdayCountTotal}
+
+            cons_rep = "Consumption yesterday: " + str(round(yesterdayConsumption, 1)) + "L \n"
+            cons_chg = "Consumption change : " + str(round(consumptionPercChange, 1)) + "% \n"
+            pmped_yest = " Litres pumped yesterday: " + str(round(yesterdayLitresPumped, 1)) + "L \n"
+            lvl_now = "Level is now: " + str(round(input1_percentage_level,1)) + "%"
+
+            self.consumption_report = cons_rep + cons_chg + pmped_yest + lvl_now
+            
 
         state_channel.publish(
             msg_str=json.dumps(msg_obj),
@@ -776,6 +788,15 @@ class target:
             channel_name='activity_logs',
         )
         last_notification_age = self.get_last_notification_age()
+
+        ##Consumption Report
+        if self.consumption_report is not None:
+            self.add_to_log("Sending consumption report")
+
+            notifications_channel.publish(
+                msg_str=self.consumption_report
+            )
+            self.consumption_report = None
 
         level_warning = None
         if level_alarm is not None and curr_level is not None and curr_level < level_alarm:
