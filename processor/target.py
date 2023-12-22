@@ -716,6 +716,7 @@ class target:
             }
         }
         #update yesterdays values
+        self.consumption_report = None
         if dt.datetime.utcnow().timestamp() > daily_time:
             self.add_to_log("updating yesterdays consumption values")
             daily_time = self.get_daily_time(reset_time)
