@@ -471,7 +471,7 @@ class target:
         ## result in L
         if lvl_prev is None or lvl_now is None:
             return None
-        delta = (lvl_prev - lvl_now) * (355/113)*((tank_diameter_cm/200)**2)/1000
+        delta = (lvl_prev - lvl_now) * (355/113)*((tank_diameter_cm/2)**2)/1000
         return delta
     
     def calc_water_consumption(self, level_delta, litres_pumped):
