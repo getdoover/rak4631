@@ -592,6 +592,9 @@ class target:
         todaysLitresPumped = None
         todaysConsumption = None
 
+        initYesterdayCountTotal = False
+        initYesterdayLevel = False
+
         
         yesterdayCountTotal = None
         try:
