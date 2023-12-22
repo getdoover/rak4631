@@ -161,14 +161,14 @@ class target:
                             "todaysConsumption": {
                                 "type": "uiVariable",
                                 "name": "todaysConsumption",
-                                "displayString": "Consumption Today (L)",
+                                "displayString": "Consumption so far Today (L)",
                                 "varType": "float",
                                 "decPrecision": 1,
                             },
                             "todaysLitresPumped": {
                                 "type": "uiVariable",
                                 "name": "todaysLitresPumped",
-                                "displayString": "Water Pumped Today (L)",
+                                "displayString": "Water Pumped so far Today (L)",
                                 "varType": "float",
                                 "decPrecision": 1,
                             },
@@ -182,7 +182,7 @@ class target:
                             "yesterdayConsumption": {
                                 "type": "uiVariable",
                                 "name": "yesterdayConsumption", 
-                                "displayString": "Daily Consumption (L)",
+                                "displayString": "Yesterdays Consumption (L)",
                                 "varType": "float",
                                 "decPrecision": 0,
                             },
@@ -592,12 +592,15 @@ class target:
         todaysLitresPumped = None
         todaysConsumption = None
 
+        
         yesterdayCountTotal = None
         try:
             yesterdayCountTotal = state_obj['state']['children']['consumption_submodule']['children']['yesterdayCountTotal']['currentValue']
         except Exception as e:
             self.add_to_log("Could not get yesterday count total - " + str(e))
             yesterdayCountTotal = total_count_reading_1
+            initYesterdayCountTotal = True
+
 
         yesterdayLevel = None
         try:
@@ -605,6 +608,7 @@ class target:
         except Exception as e:
             self.add_to_log("Could not get yesterday level - " + str(e))
             yesterdayLevel = input1_percentage_level
+            initYesterdayLevel = True
 
         yesterdayConsumption = None
         try:
@@ -624,6 +628,8 @@ class target:
             yesterdayLevelDifference = state_obj['state']['children']['consumption_submodule']['children']['yesterdayLevelDifference']['currentValue']
         except Exception as e:
             self.add_to_log("Could not get yesterday level difference - " + str(e))
+
+        
 
         if total_count_reading_1 is not None:
             self.add_to_log("refresh time is " + str(daily_time))
@@ -734,7 +740,12 @@ class target:
             lvl_now = "Level is now: " + str(round(input1_percentage_level,1)) + "%"
 
             self.consumption_report = cons_rep + cons_chg + pmped_yest + lvl_now
-            
+        
+        if initYesterdayLevel:
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayLevel"] = {"currentValue" : yesterdayLevel}
+
+        if initYesterdayCountTotal:
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayCountTotal"] = {"currentValue" : yesterdayCountTotal}
 
         state_channel.publish(
             msg_str=json.dumps(msg_obj),
