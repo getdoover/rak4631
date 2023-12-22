@@ -559,7 +559,7 @@ class target:
         input1_percentage_level = None
         if raw_reading_1 is not None and raw_reading_1 > 3.8:
             # if sensor_1_type == "submersibleLevel"
-            input1_processed = int( (raw_reading_1 - 4) * 0.1875 * 1.6 * 100 )
+            input1_processed = round(((raw_reading_1 - 4) * 0.1875 * 1.6 * 100 ),4)
             input1_processed = (input1_processed + sensor_1_zero_cal) * sensor_1_scaling_cal
             input1_percentage_level = round((input1_processed / sensor_1_max) * 100, 1)
 
