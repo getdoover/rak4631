@@ -626,9 +626,9 @@ class target:
             self.add_to_log("Could not get yesterday litres pumped - " + str(e))
 
         
-        yesterdayLevelDifference = None
+        yesterdayWaterConsumptionFromLevel = None
         try:
-            yesterdayLevelDifference = state_obj['state']['children']['consumption_submodule']['children']['yesterdayLevelDifference']['currentValue']
+            yesterdayWaterConsumptionFromLevel = state_obj['state']['children']['consumption_submodule']['children']['yesterdayWaterConsumptionFromLevel']['currentValue']
         except Exception as e:
             self.add_to_log("Could not get yesterday level difference - " + str(e))
 
@@ -637,13 +637,17 @@ class target:
         if total_count_reading_1 is not None:
             self.add_to_log("refresh time is " + str(daily_time))
             self.add_to_log("datetime.utcnow().timstamp() " + str(dt.datetime.utcnow().timestamp()))
-
-            
+            self.add_to_log("++++++++++++++++++++++ DEBUG ++++++++++++++++++++++")
+            self.add_to_log("yesterdayCountTotal " + str(yesterdayCountTotal))
+            self.add_to_log("total_count_reading_1 " + str(total_count_reading_1))
             todaysLitresPumped = (total_count_reading_1 - yesterdayCountTotal)*10
-            todaysLevelPercDiff = input1_percentage_level - yesterdayLevel
-            todaysLevelDifference  = self.calc_water_level_delta(yesterdayLevel, input1_percentage_level, tank_diameter)
+            self.add_to_log("todaysLitresPumped " + str(todaysLitresPumped))
+            self.add_to_log("++++++++++++++++++++++ DEBUG ++++++++++++++++++++++")
 
-            todaysConsumption = todaysLitresPumped + todaysLevelDifference
+            todaysLevelPercDiff = input1_percentage_level - yesterdayLevel
+            todaysWaterConsumptionFromLevel  = self.calc_water_level_delta(yesterdayLevel, input1_percentage_level, tank_diameter)
+
+            todaysConsumption = todaysLitresPumped + todaysWaterConsumptionFromLevel
             
         total_litres = None
         if total_count_reading_1 is not None:
@@ -678,8 +682,8 @@ class target:
                             "todaysLevelPercDiff" :{
                                 "currentValue" : todaysLevelPercDiff
                             },
-                            "todaysLitresPumped" :{
-                                "currentValue" : todaysLevelDifference
+                            "todaysWaterConsumptionFromLevel" :{
+                                "currentValue" : todaysWaterConsumptionFromLevel
                             },
                         },
                     },
@@ -728,8 +732,8 @@ class target:
             yesterdayLevel = input1_percentage_level
             msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayLevel"] = {"currentValue" : yesterdayLevel}
 
-            yesterdayLevelDifference = todaysLevelDifference
-            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayLevelDifference"] = {"currentValue" : yesterdayLevelDifference}
+            yesterdayWaterConsumptionFromLevel = todaysWaterConsumptionFromLevel
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayWaterConsumptionFromLevel"] = {"currentValue" : yesterdayWaterConsumptionFromLevel}
 
             yesterdayCount = total_count_reading_1 - yesterdayCountTotal
             msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayCount"] = {"currentValue" : yesterdayCount}
