@@ -480,9 +480,8 @@ class target:
 
     
     def get_daily_time(self, reset_time):
-        # if (reset_time + 10) > 23:
-        #     _reset_time = (reset_time + 10)%23
-        return (dt.datetime.utcnow()+dt.timedelta(days=1)).replace(hour=(reset_time+10)%23, minute=0, second=0, microsecond=0).timestamp()
+        reset_time = (reset_time - 10)%23
+        return (dt.datetime.utcnow()+dt.timedelta(days=1)).replace(hour=reset_time, minute=0, second=0, microsecond=0).timestamp()
 
     ## Compute output values from raw values
     def compute_output_levels(self, cmds_channel, state_channel):
@@ -490,7 +489,7 @@ class target:
         state_obj = state_channel.get_aggregate()
         cmds_obj = cmds_channel.get_aggregate()
 
-        reset_time = 15 #time in 24hour time and must be an integer
+        reset_time = 12 #time in 24hour time and must be an integer
         daily_time = None
 
         try:
@@ -722,6 +721,8 @@ class target:
         if dt.datetime.utcnow().timestamp() > daily_time:
             self.add_to_log("updating yesterdays consumption values")
             daily_time = self.get_daily_time(reset_time)
+            if yesterdayConsumption is None:
+                yesterdayConsumption = 0
 
             consumptionPercChange = (todaysConsumption/yesterdayConsumption - 1) * 100
 
