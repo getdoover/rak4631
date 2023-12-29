@@ -481,7 +481,9 @@ class target:
     
     def get_daily_time(self, reset_time):
         reset_time = (reset_time - 10)%23
-        return (dt.datetime.utcnow()+dt.timedelta(days=1)).replace(hour=reset_time, minute=0, second=0, microsecond=0).timestamp()
+        # return (dt.datetime.utcnow()+dt.timedelta(days=1)).replace(hour=reset_time, minute=0, second=0, microsecond=0).timestamp()
+        return (dt.datetime.utcnow()+dt.timedelta(days=0)).replace(hour=reset_time, minute=0, second=0, microsecond=0).timestamp()
+
 
     ## Compute output values from raw values
     def compute_output_levels(self, cmds_channel, state_channel):
@@ -489,7 +491,7 @@ class target:
         state_obj = state_channel.get_aggregate()
         cmds_obj = cmds_channel.get_aggregate()
 
-        reset_time = 17 #time in 24hour time and must be an integer
+        reset_time = 18 #time in 24hour time and must be an integer
         daily_time = None
 
         try:
