@@ -489,7 +489,7 @@ class target:
         state_obj = state_channel.get_aggregate()
         cmds_obj = cmds_channel.get_aggregate()
 
-        reset_time = 12 #time in 24hour time and must be an integer
+        reset_time = 17 #time in 24hour time and must be an integer
         daily_time = None
 
         try:
@@ -721,10 +721,22 @@ class target:
         if dt.datetime.utcnow().timestamp() > daily_time:
             self.add_to_log("updating yesterdays consumption values")
             daily_time = self.get_daily_time(reset_time)
-            if yesterdayConsumption is None:
-                yesterdayConsumption = 0
 
-            consumptionPercChange = (todaysConsumption/yesterdayConsumption - 1) * 100
+            consumptionPercChange = None
+            if yesterdayConsumption is not None:
+                consumptionPercChange = (todaysConsumption/yesterdayConsumption - 1) * 100
+                cons_rep = "Consumption yesterday: " + str(round(yesterdayConsumption, 1)) + "L \n"
+
+            if consumptionPercChange is not None:
+                cons_chg = "Consumption change : " + str(round(consumptionPercChange, 1)) + "% \n"
+
+            if yesterdayLitresPumped is not None:
+                pmped_yest = " Litres pumped yesterday: " + str(round(yesterdayLitresPumped, 1)) + "L \n"
+
+            if input1_percentage_level is not None:
+                lvl_now = "Level is now: " + str(round(input1_percentage_level,1)) + "%"
+
+            self.consumption_report = cons_rep + cons_chg + pmped_yest + lvl_now
 
             yesterdayConsumption = todaysConsumption
             msg_obj["state"]["children"]["yesterdayConsumption"] = {"currentValue" : yesterdayConsumption}
@@ -745,12 +757,6 @@ class target:
             yesterdayCountTotal = total_count_reading_1
             msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayCountTotal"] = {"currentValue" : yesterdayCountTotal}
 
-            cons_rep = "Consumption yesterday: " + str(round(yesterdayConsumption, 1)) + "L \n"
-            cons_chg = "Consumption change : " + str(round(consumptionPercChange, 1)) + "% \n"
-            pmped_yest = " Litres pumped yesterday: " + str(round(yesterdayLitresPumped, 1)) + "L \n"
-            lvl_now = "Level is now: " + str(round(input1_percentage_level,1)) + "%"
-
-            self.consumption_report = cons_rep + cons_chg + pmped_yest + lvl_now
         
         if inityesterdayHeight:
             msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayHeight"] = {"currentValue" : yesterdayHeight}
