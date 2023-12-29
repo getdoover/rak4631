@@ -491,7 +491,7 @@ class target:
         state_obj = state_channel.get_aggregate()
         cmds_obj = cmds_channel.get_aggregate()
 
-        reset_time = 18 #time in 24hour time and must be an integer
+        reset_time = 19 #time in 24hour time and must be an integer
         daily_time = None
 
         try:
@@ -725,22 +725,27 @@ class target:
             daily_time = self.get_daily_time(reset_time)
 
             consumptionPercChange = None
+            cons_rep = ""
             if yesterdayConsumption is not None:
                 consumptionPercChange = (todaysConsumption/yesterdayConsumption - 1) * 100
                 cons_rep = "Consumption yesterday: " + str(round(yesterdayConsumption, 1)) + "L \n"
 
+            cons_chg = ""
             if consumptionPercChange is not None:
                 cons_chg = "Consumption change : " + str(round(consumptionPercChange, 1)) + "% \n"
 
+            pmped_yest = ""
             if yesterdayLitresPumped is not None:
                 pmped_yest = " Litres pumped yesterday: " + str(round(yesterdayLitresPumped, 1)) + "L \n"
 
+            lvl_now = ""
             if input1_percentage_level is not None:
                 lvl_now = "Level is now: " + str(round(input1_percentage_level,1)) + "%"
 
             self.consumption_report = cons_rep + cons_chg + pmped_yest + lvl_now
 
             yesterdayConsumption = todaysConsumption
+            
             msg_obj["state"]["children"]["yesterdayConsumption"] = {"currentValue" : yesterdayConsumption}
             msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayConsumption"] = {"currentValue" : yesterdayConsumption}
 
