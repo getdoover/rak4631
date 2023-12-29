@@ -481,8 +481,8 @@ class target:
     
     def get_daily_time(self, reset_time):
         reset_time = (reset_time - 10)%23
-        # return (dt.datetime.utcnow()+dt.timedelta(days=1)).replace(hour=reset_time, minute=0, second=0, microsecond=0).timestamp()
-        return (dt.datetime.utcnow()+dt.timedelta(days=0)).replace(hour=reset_time, minute=0, second=0, microsecond=0).timestamp()
+        return (dt.datetime.utcnow()+dt.timedelta(days=1)).replace(hour=reset_time, minute=0, second=0, microsecond=0).timestamp()
+        # return (dt.datetime.utcnow()+dt.timedelta(days=0)).replace(hour=reset_time, minute=0, second=0, microsecond=0).timestamp()
 
 
     ## Compute output values from raw values
@@ -491,7 +491,7 @@ class target:
         state_obj = state_channel.get_aggregate()
         cmds_obj = cmds_channel.get_aggregate()
 
-        reset_time = 19 #time in 24hour time and must be an integer
+        reset_time = 7 #time in 24hour time and must be an integer
         daily_time = None
 
         try:
@@ -752,7 +752,7 @@ class target:
             yesterdayLitresPumped = todaysLitresPumped
             msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayLitresPumped"] = {"currentValue" : yesterdayLitresPumped}
 
-            yesterdayHeight = input1_percentage_level
+            yesterdayHeight = input1_processed
             msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayHeight"] = {"currentValue" : yesterdayHeight}
 
             yesterdayWaterConsumptionFromLevel = todaysWaterConsumptionFromLevel
@@ -764,6 +764,11 @@ class target:
             yesterdayCountTotal = total_count_reading_1
             msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayCountTotal"] = {"currentValue" : yesterdayCountTotal}
 
+            #zero daily counts
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["todaysConsumption"]= {"currentValue" : 0}
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["todaysLitresPumped"]= {"currentValue" : 0}
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["todaysHeightDiff"]= {"currentValue" : 0}
+            msg_obj["state"]["children"]["consumption_submodule"]["children"]["todaysWaterConsumptionFromLevel"]= {"currentValue" : 0}
         
         if inityesterdayHeight:
             msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayHeight"] = {"currentValue" : yesterdayHeight}
