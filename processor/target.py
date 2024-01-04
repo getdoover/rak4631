@@ -726,7 +726,7 @@ class target:
 
             consumptionPercChange = None
             cons_rep = ""
-            if yesterdayConsumption is not None:
+            if yesterdayConsumption is not None and yesterdayConsumption is not 0 :
                 consumptionPercChange = (todaysConsumption/yesterdayConsumption - 1) * 100
                 cons_rep = "Consumption yesterday: " + str(round(yesterdayConsumption, 1)) + "L \n"
 
@@ -746,6 +746,7 @@ class target:
 
             yesterdayConsumption = todaysConsumption
             
+            msg_obj["state"]["children"]["resetDailyValuesTime"] = { "currentValue" : daily_time}
             msg_obj["state"]["children"]["yesterdayConsumption"] = {"currentValue" : yesterdayConsumption}
             msg_obj["state"]["children"]["consumption_submodule"]["children"]["yesterdayConsumption"] = {"currentValue" : yesterdayConsumption}
 
