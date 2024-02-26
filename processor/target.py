@@ -128,7 +128,15 @@ class target:
                             }
                         ]
                     },
-                    "batteryLevel": {
+                    "levelAlarmSlider":{
+                        "type": "uiSlider",
+                        "name": "levelAlarmSlider",
+                        "displayString": "Level Alarm (%)",
+                        "min": 0,
+                        "max": 100,
+                        "dualSlider": True,
+                    },
+                    "batteryLevel": { 
                         "type": "uiVariable",
                         "name": "batteryLevel",
                         "displayString": "Battery (%)",
