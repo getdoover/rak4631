@@ -135,6 +135,7 @@ class target:
                         "min": 0,
                         "max": 100,
                         "dualSlider": True,
+                        "icon": "fa-regular fa-bell"
                     },
                     "batteryLevel": { 
                         "type": "uiVariable",
@@ -344,6 +345,12 @@ class target:
     ## Compute output values from raw values
     def compute_output_levels(self, cmds_channel, state_channel, uplink_channel):
 
+        self.notifications_channel = pd.channel(
+            api_client=self.cli.api_client,
+            agent_id=self.kwargs['agent_id'],
+            channel_name='significantEvent',
+        )
+
         uplink_obj = uplink_channel.get_aggregate()
         state_obj = state_channel.get_aggregate()
         cmds_obj = cmds_channel.get_aggregate()
@@ -427,9 +434,47 @@ class target:
                 }
             }
         }
+
+        if input1_percentage_level is not None:
+            self.add_to_log("the ui state is " + json.dumps(state_obj) )
+            self.notifications_channel.publish(
+                        msg_str = (f"Level is below {min}" + json.dumps(state_obj))
+                    )
+            
+            # isDualSlider = state_obj["state"]["children"]["humidityAlarmSlider"]["isDualSlider"]
+            try:
+                max = 95#cmds_obj['cmds']["humidityAlarmSlider"][1]
+                min = 30#cmds_obj['cmds']["humidityAlarmSlider"][0]
+            except Exception as e:
+                self.add_to_log("Error getting humidityAlarmSlider min and max - " + str(e))
+                max = None
+                min = None
+
+            if min is not None and max is not None:
+                if input1_percentage_level < min:
+                    #send text
+                    self.notifications_channel.publish(
+                        msg_str = f"Level is below {min} %",
+                    )
+                    #show in activity log
+                    # self.activity_log_channel.publish(json.dumps({
+                    #     "activity_log" : {
+                    #         "action_string" : "Mid Humidity is below {min} %"
+                    #     }
+                    # }))
+                    
+                    ## show in ui as alert
+
+                if input1_percentage_level > max:
+                    self.notifications_channel.publish(
+                        msg_str = f"Level is above {max} %",
+                    )
+
+
         state_channel.publish(
             msg_str=json.dumps(msg_obj),
         )
+
 
     def batt_volts_to_percent(self, volts):
         
