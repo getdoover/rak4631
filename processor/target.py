@@ -396,7 +396,7 @@ class target:
         input1_processed = None
         input1_percentage_level = None
         if raw_reading_1 is not None and raw_reading_1 > 0:
-            input1_processed = sensor_1_max - raw_reading_1
+            # input1_processed = sensor_1_max - raw_reading_1
             input1_processed = (input1_processed + sensor_1_zero_cal) * sensor_1_scaling_cal
             input1_percentage_level = round((input1_processed / sensor_1_max) * 100, 1)
 
