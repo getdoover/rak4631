@@ -437,8 +437,9 @@ class target:
 
         if input1_percentage_level is not None:
             self.add_to_log("the ui state is " + json.dumps(state_obj) )
+            
             self.notifications_channel.publish(
-                        msg_str = (f"Level is below testing" + json.dumps(state_obj["state"]["children"]["level"]["currentValue"]))
+                        msg_str = (f"Level is below testing" + json.dumps(state_obj["state"]["children"]["level"]))
                     )
             
             # isDualSlider = state_obj["state"]["children"]["humidityAlarmSlider"]["isDualSlider"]
