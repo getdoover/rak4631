@@ -435,43 +435,6 @@ class target:
             }
         }
 
-        if input1_percentage_level is not None:
-            self.add_to_log("the ui state is " + json.dumps(state_obj) )
-            
-            self.notifications_channel.publish(
-                        msg_str = (f"Level is below testing" + json.dumps(state_obj["state"]["children"]["level"]))
-                    )
-            
-            # isDualSlider = state_obj["state"]["children"]["humidityAlarmSlider"]["isDualSlider"]
-            try:
-                max = 95#cmds_obj['cmds']["humidityAlarmSlider"][1]
-                min = 30#cmds_obj['cmds']["humidityAlarmSlider"][0]
-            except Exception as e:
-                self.add_to_log("Error getting humidityAlarmSlider min and max - " + str(e))
-                max = None
-                min = None
-
-            if min is not None and max is not None:
-                if input1_percentage_level < min:
-                    #send text
-                    self.notifications_channel.publish(
-                        msg_str = f"Level is below {min} %",
-                    )
-                    #show in activity log
-                    # self.activity_log_channel.publish(json.dumps({
-                    #     "activity_log" : {
-                    #         "action_string" : "Mid Humidity is below {min} %"
-                    #     }
-                    # }))
-                    
-                    ## show in ui as alert
-
-                if input1_percentage_level > max:
-                    self.notifications_channel.publish(
-                        msg_str = f"Level is above {max} %",
-                    )
-
-
         state_channel.publish(
             msg_str=json.dumps(msg_obj),
         )
