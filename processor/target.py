@@ -727,7 +727,11 @@ class target:
             consumptionPercChange = None
             cons_rep = ""
             if yesterdayConsumption is not None and yesterdayConsumption is not 0 :
-                consumptionPercChange = (todaysConsumption/yesterdayConsumption - 1) * 100
+                try:
+                    consumptionPercChange = (todaysConsumption/yesterdayConsumption - 1) * 100
+                except Exception as e:
+                    print("Error calculating consumption change - " + str(e))
+                    consumptionPercChange = 0
                 cons_rep = "Consumption yesterday: " + str(round(yesterdayConsumption, 1)) + "L \n"
 
             cons_chg = ""
