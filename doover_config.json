@@ -1,5 +1,5 @@
 {
-    "deployment_package_dir": "processor/",
+    "deployment_package_dir": "doover_processor/",
     "ul_payload_formatter" : "payload_formatters/ul_formatter.js",
     "dl_payload_formatter" : "payload_formatters/dl_formatter.js",
     "installers" : [

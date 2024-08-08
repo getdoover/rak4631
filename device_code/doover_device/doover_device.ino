@@ -6,6 +6,9 @@
    @date 2021-09-10
    @copyright Copyright (c) 2021
 */
+
+// Example 
+
 #include <Arduino.h>
 /** Add you required includes after Arduino.h */
 #include <Wire.h>
@@ -57,6 +60,10 @@
 #define SW_VERSION_2 0 // minor version increase on API change / backward compatible
 #define SW_VERSION_3 0 // patch version increase on bugfix, no affect on API
 
+/** Application events */
+#define PIR_TRIGGER   0b0000000000100000
+#define N_PIR_TRIGGER 0b1111111111011111
+
 /**
    Optional hard-coded LoRaWAN credentials for OTAA and ABP.
    It is strongly recommended to avoid duplicated node credentials
@@ -65,17 +72,17 @@
    - over BLE with My nRF52 Toolbox
 */
 
-// uint8_t node_device_eui[8] = { {{ dev_eui_msb_array }} };
-uint8_t node_device_eui[8] = {0x00, 0x0D, 0x75, 0xE6, 0x56, 0x4D, 0xC1, 0xF3};
+uint8_t node_device_eui[8] = { {{ dev_eui_msb_array }} };
+// uint8_t node_device_eui[8] = { 0x70, 0xB3, 0xD5, 0x7E, 0xD0, 0x05, 0x1E, 0x75 };
 
-// uint8_t node_app_eui[8] = { {{ join_eui_msb_array }} };
-uint8_t node_app_eui[8] = {0x70, 0xB3, 0xD5, 0x7E, 0xD0, 0x02, 0x01, 0xE1};
+uint8_t node_app_eui[8] = { {{ join_eui_msb_array }} };
+// uint8_t node_app_eui[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
-// uint8_t node_app_key[16] = { {{ app_key_msb_array }} };
-uint8_t node_app_key[16] = {0x2B, 0x84, 0xE0, 0xB0, 0x9B, 0x68, 0xE5, 0xCB, 0x42, 0x17, 0x6F, 0xE7, 0x53, 0xDC, 0xEE, 0x79};
+uint8_t node_app_key[16] = { {{ app_key_msb_array }} };
+// uint8_t node_app_key[16] = { 0x83, 0xCB, 0xB1, 0x10, 0x45, 0x87, 0x70, 0x5C, 0xBD, 0x8C, 0x0B, 0xF8, 0x0F, 0xAB, 0x31, 0x04 };
 
-uint8_t node_nws_key[16] = {0x32, 0x3D, 0x15, 0x5A, 0x00, 0x0D, 0xF3, 0x35, 0x30, 0x7A, 0x16, 0xDA, 0x0C, 0x9D, 0xF5, 0x3F};
-uint8_t node_apps_key[16] = {0x3F, 0x6A, 0x66, 0x45, 0x9D, 0x5E, 0xDC, 0xA6, 0x3C, 0xBC, 0x46, 0x19, 0xCD, 0x61, 0xA1, 0x1E};
+// uint8_t node_nws_key[16] = {0x32, 0x3D, 0x15, 0x5A, 0x00, 0x0D, 0xF3, 0x35, 0x30, 0x7A, 0x16, 0xDA, 0x0C, 0x9D, 0xF5, 0x3F};
+// uint8_t node_apps_key[16] = {0x3F, 0x6A, 0x66, 0x45, 0x9D, 0x5E, 0xDC, 0xA6, 0x3C, 0xBC, 0x46, 0x19, 0xCD, 0x61, 0xA1, 0x1E};
 
 /** Application function definitions */
 void setup_app(void);
@@ -83,8 +90,35 @@ bool init_app(void);
 void app_event_handler(void);
 void ble_data_handler(void) __attribute__((weak));
 void lora_data_handler(void);
+void pin_change_triggered(void);
+bool send_periodic_lora_frame(void);
+
 
 /** Application stuff */
+/** Burst Mode */
+uint32_t burst_mode_sleep_time = 30 * 1000; // 30 seconds
+uint32_t burst_mode_counter = 20;
+
+/** Sleep Cycle */
+uint32_t default_sleep_time = 10 * 60 * 1000; // 10 minutes
+uint32_t sleep_time = burst_mode_sleep_time;
+
+/** Counter */
+time_t time_change_interrupt = millis();
+//uint64_t total_counts = 0;
+uint32_t total_counts = 0;
+uint32_t last_message_counts = 0;
+
+
+// Battery Voltage
+#define PIN_VBAT WB_A0
+uint32_t batt_volts_pin = PIN_VBAT;
+
+#define VBAT_MV_PER_LSB (0.73242188F) // 3.0V ADC range and 12 - bit ADC resolution = 3000mV / 4096
+#define VBAT_DIVIDER_COMP (1.73)      // Compensation factor for the VBAT divider, depend on the board
+
+#define REAL_VBAT_MV_PER_LSB (VBAT_DIVIDER_COMP * VBAT_MV_PER_LSB)
+
 
 /** Set the device name, max length is 10 characters */
 char g_ble_dev_name[10] = "RAK-TEST";
@@ -117,11 +151,11 @@ void setup_app(void)
 	}
 	digitalWrite(LED_GREEN, LOW);
 
-	MYLOG("APP", "Setup WisBlock API Example");
+	MYLOG("APP", "Setup Doover RAK4631 Node");
 
 #ifdef NRF52_SERIES
 	// Enable BLE
-	g_enable_ble = true;
+  	g_enable_ble = false;
 #endif
 
 	// Set firmware version
@@ -142,22 +176,22 @@ void setup_app(void)
 	memcpy(g_lorawan_settings.node_device_eui, node_device_eui, 8); // OTAA Device EUI MSB
 	memcpy(g_lorawan_settings.node_app_eui, node_app_eui, 8);		// OTAA Application EUI MSB
 	memcpy(g_lorawan_settings.node_app_key, node_app_key, 16);		// OTAA Application Key MSB
-	memcpy(g_lorawan_settings.node_nws_key, node_nws_key, 16);		// ABP Network Session Key MSB
-	memcpy(g_lorawan_settings.node_apps_key, node_apps_key, 16);	// ABP Application Session key MSB
-	g_lorawan_settings.node_dev_addr = 0x26021FB4;					// ABP Device Address MSB
+	// memcpy(g_lorawan_settings.node_nws_key, node_nws_key, 16);		// ABP Network Session Key MSB
+	// memcpy(g_lorawan_settings.node_apps_key, node_apps_key, 16);	// ABP Application Session key MSB
+	// g_lorawan_settings.node_dev_addr = 0x26021FB4;					// ABP Device Address MSB
 	g_lorawan_settings.send_repeat_time = 120000;					// Send repeat time in milliseconds: 2 * 60 * 1000 => 2 minutes
-	g_lorawan_settings.adr_enabled = false;							// Flag for ADR on or off
+	g_lorawan_settings.adr_enabled = true;							// Flag for ADR on or off
 	g_lorawan_settings.public_network = true;						// Flag for public or private network
 	g_lorawan_settings.duty_cycle_enabled = false;					// Flag to enable duty cycle (validity depends on Region)
 	g_lorawan_settings.join_trials = 5;								// Number of join retries
-	g_lorawan_settings.tx_power = 0;								// TX power 0 .. 15 (validity depends on Region)
+	g_lorawan_settings.tx_power = 22;								// TX power 0 .. 15 (validity depends on Region)
 	g_lorawan_settings.data_rate = 3;								// Data rate 0 .. 15 (validity depends on Region)
 	g_lorawan_settings.lora_class = 0;								// LoRaWAN class 0: A, 2: C, 1: B is not supported
-	g_lorawan_settings.subband_channels = 1;						// Subband channel selection 1 .. 9
-	g_lorawan_settings.app_port = 2;								// Data port to send data
+	g_lorawan_settings.subband_channels = 2;						// Subband channel selection 1 .. 9
+	// g_lorawan_settings.app_port = 2;								// Data port to send data
 	g_lorawan_settings.confirmed_msg_enabled = LMH_UNCONFIRMED_MSG; // Flag to enable confirmed messages
 	g_lorawan_settings.resetRequest = true;							// Command from BLE to reset device
-	g_lorawan_settings.lora_region = LORAMAC_REGION_AS923_3;		// LoRa region
+	g_lorawan_settings.lora_region = LORAMAC_REGION_AU915;		// LoRa region
 	// Save LoRaWAN settings
 	api_set_credentials();
 }
@@ -170,7 +204,30 @@ void setup_app(void)
 bool init_app(void)
 {
 	MYLOG("APP", "init_app");
+
+	// Setup the pin and interrupt for tipping spoon counter
+	pinMode(WB_IO2, INPUT_PULLDOWN);
+  	attachInterrupt(WB_IO2, pin_change_triggered, RISING);
+
 	return true;
+}
+
+void pin_change_triggered(void){
+  noInterrupts();
+//  MYLOG("APP", "Rising Interrupt %u", millis());
+  // Only trigger if has been high for more than 250ms, and is now low
+  bool run_task = false;
+  if ((digitalRead(WB_IO2) == HIGH) && (millis() - time_change_interrupt > 250)){
+    run_task=true;
+    time_change_interrupt = millis();
+  }
+  if ( run_task ){
+  	// Define the event type
+  	g_task_event_type |= PIR_TRIGGER;
+  	// Wake up the handler, it will check g_task_event_type and know that he has to handle an PIR alarm.
+  	xSemaphoreGiveFromISR(g_task_sem, pdFALSE);
+  }
+  interrupts();
 }
 
 /**
@@ -200,26 +257,39 @@ void app_event_handler(void)
 		else
 		{
 
-			// Dummy packet
+			send_periodic_lora_frame();
 
-			uint8_t dummy_packet[] = {0x10, 0x00, 0x00};
+			// // Dummy packet
+			// uint8_t dummy_packet[] = {0x10, 0x00, 0x00};
+			// lmh_error_status result = send_lora_packet(dummy_packet, 3);
 
-			lmh_error_status result = send_lora_packet(dummy_packet, 3);
-			switch (result)
-			{
-			case LMH_SUCCESS:
-				MYLOG("APP", "Packet enqueued");
-				// Set a flag that TX cycle is running
-				lora_busy = true;
-				break;
-			case LMH_BUSY:
-				MYLOG("APP", "LoRa transceiver is busy");
-				break;
-			case LMH_ERROR:
-				MYLOG("APP", "Packet error, too big to send with current DR");
-				break;
-			}
+			// switch (result)
+			// {
+			// case LMH_SUCCESS:
+			// 	MYLOG("APP", "Packet enqueued");
+			// 	// Set a flag that TX cycle is running
+			// 	lora_busy = true;
+			// 	break;
+			// case LMH_BUSY:
+			// 	MYLOG("APP", "LoRa transceiver is busy");
+			// 	break;
+			// case LMH_ERROR:
+			// 	MYLOG("APP", "Packet error, too big to send with current DR");
+			// 	break;
+			// }
 		}
+	}
+
+	// Check if PIR triggered event
+	if ((g_task_event_type & PIR_TRIGGER) == PIR_TRIGGER) {
+		g_task_event_type &= N_PIR_TRIGGER;
+		MYLOG("APP", "PIR triggered event");
+
+		total_counts += 1;
+		last_message_counts += 1;
+
+		MYLOG("APP", "Total Count = %u", total_counts);
+		MYLOG("APP", "Last Count = %u", last_message_counts);
 	}
 }
 
@@ -268,12 +338,14 @@ void lora_data_handler(void)
 		if (g_join_result)
 		{
 			MYLOG("APP", "Successfully joined network");
+			send_periodic_lora_frame();
+			api_timer_restart(sleep_time);
 		}
 		else
 		{
 			MYLOG("APP", "Join network failed");
 			/// \todo here join could be restarted.
-			// lmh_join();
+			lmh_join();
 		}
 	}
 
@@ -288,6 +360,7 @@ void lora_data_handler(void)
 		/**************************************************************/
 		g_task_event_type &= N_LORA_DATA;
 		MYLOG("APP", "Received package over LoRa");
+		
 		char log_buff[g_rx_data_len * 3] = {0};
 		uint8_t log_idx = 0;
 		for (int idx = 0; idx < g_rx_data_len; idx++)
@@ -295,8 +368,45 @@ void lora_data_handler(void)
 			sprintf(&log_buff[log_idx], "%02X ", g_rx_lora_data[idx]);
 			log_idx += 3;
 		}
+		MYLOG("APP", "Message : %s", log_buff);
 		lora_busy = false;
-		MYLOG("APP", "%s", log_buff);
+		
+		if (g_rx_data_len == 2){
+			// This is a burst mode message
+			MYLOG("APP", "Recieved a new burst mode message");
+
+			uint32_t new_counter = g_rx_lora_data[0] << 8;
+			new_counter |= g_rx_lora_data[1];
+
+			burst_mode_counter = new_counter;
+			sleep_time = burst_mode_sleep_time;
+
+			// After setting a new burst mode counter time, send a new packet to update the reported sleep interval  
+			send_periodic_lora_frame();
+			api_timer_restart(sleep_time);
+		}
+		else {
+
+			// Assuming the new time is encoded as 3 bytes. e.g. 30=> 0x00, 0x00, 0x1F
+			// Downlink must be sent on Port2
+			// Downlink is in seconds
+			uint32_t new_time = g_rx_lora_data[0] << 16;
+			new_time |= g_rx_lora_data[1] << 8;
+			new_time |= g_rx_lora_data[2];
+			
+			sleep_time = new_time * 1000;
+			default_sleep_time = sleep_time; // Set the default long sleep time to this as well, so it will revert to this again after burst mode
+			
+			MYLOG("APP", "New uplink time set %i", new_time);
+	
+			// If a new sleep time is set manually, then forget about the init fast counter
+			burst_mode_counter = 0;
+	
+			// After setting a new sleep time, send a new packet to update the reported sleep interval
+			send_periodic_lora_frame();
+			api_timer_restart(sleep_time);
+		}
+
 	}
 
 	// LoRa TX finished handling
@@ -322,4 +432,133 @@ void lora_data_handler(void)
 		// Clear the LoRa TX flag
 		lora_busy = false;
 	}
+}
+
+
+float readVBAT(void)
+{
+	float raw;
+
+	// Get the raw 12-bit, 0..3000mV ADC value
+	analogReadResolution(12);
+	raw = analogRead(batt_volts_pin);
+	delay(50);
+	analogReadResolution(10);
+
+	return raw * REAL_VBAT_MV_PER_LSB;
+}
+uint8_t mvToPercent(float mvolts)
+{
+	if (mvolts < 3300)
+		return 0;
+	if (mvolts < 3600)
+	{
+		mvolts -= 3300;
+		return mvolts / 30;
+	}
+	mvolts -= 3600;
+	return 10 + (mvolts * 0.15F); // thats mvolts /6.66666666
+}
+
+
+bool send_periodic_lora_frame(void)
+{
+	if (lmh_join_status_get() != LMH_SET)
+	{
+		//Not joined, try again later
+		MYLOG("APP", "Trying to send lora frame without being joined - try later");
+		return false;
+	}
+
+  	// Assess the sleep time situation; If the initial startup time has elapsed, then change to long term sleep time
+	if (burst_mode_counter == 1){
+
+		sleep_time = default_sleep_time;
+		MYLOG("APP", "Switching to long sleep time %i", default_sleep_time);
+		api_timer_restart(sleep_time);
+	}
+	if (burst_mode_counter > 0){
+		burst_mode_counter = burst_mode_counter - 1;
+		MYLOG("APP", "%i more messages in burst mode", burst_mode_counter);
+	}
+  
+
+	// Battery Voltage
+	// Get a raw ADC reading
+	analogReference(AR_INTERNAL_3_0);
+	delay(50);
+	int vbat_mv = readVBAT();
+	int vbat_VOLT = (vbat_mv / 10) - 300;
+
+	analogReference(AR_INTERNAL);   //This takes it back to default (3.6V)
+
+	// Convert from raw mv to percentage (based on LIPO chemistry)
+	uint8_t vbat_per = mvToPercent(vbat_mv);
+	
+
+	// Make a sensor reading
+    int sensor_pin = A1;   // select the input pin for the potentiometer
+    int mcu_ain_value = 0;  
+    int average_value;  
+    float voltage_ain;
+    float current_sensor; // variable to store the value coming from the sensor
+
+	/* WisBLOCK 5801 Power On*/
+	pinMode(WB_IO1, OUTPUT);
+	digitalWrite(WB_IO1, HIGH);
+	delay(3000);
+	/* WisBLOCK 5801 Power On*/
+
+	// Take 10 readings, then get the average
+    int i;
+	for (i = 0; i < 10; i++){ mcu_ain_value += analogRead(sensor_pin); }
+
+    /* WisBLOCK 5801 Power Off*/
+  	digitalWrite(WB_IO1, LOW);
+    /* WisBLOCK 5801 Power Off*/
+
+    average_value = mcu_ain_value / i;
+    voltage_ain = average_value * 3.6 /1024;      //raef 3.6v / 10bit ADC
+    current_sensor = voltage_ain / 149.9 * 1000;    //WisBlock RAK5801 I=U/149.9\*1000 (mA)
+    int current_sensor_payload = current_sensor * 1000;
+    
+	MYLOG("APP", "--------Total Counts------- =  %u", total_counts);
+	MYLOG("APP", "-------Counts Payload------ =  %u", last_message_counts);
+	MYLOG("APP", "-------Current Sensor------ =  %f", current_sensor);
+	MYLOG("APP", "--Current Sensor Payload--- =  %d", current_sensor_payload);
+	MYLOG("APP", "-----Batt Voltage (mV)----- =  %d", vbat_mv);
+	MYLOG("APP", "---Batt Level (Percent)---- =  %d", vbat_per);
+
+	// Compile the lora packet
+	uint8_t m_lora_app_data_buffer[64]; // Max 64 bytes long
+
+	uint32_t buffSize = 0;
+	
+	m_lora_app_data_buffer[buffSize++] = highByte(current_sensor_payload); //0
+	m_lora_app_data_buffer[buffSize++] = lowByte(current_sensor_payload);  //1
+	m_lora_app_data_buffer[buffSize++] = highByte(last_message_counts);    //2
+	m_lora_app_data_buffer[buffSize++] = lowByte(last_message_counts);  //3
+	m_lora_app_data_buffer[buffSize++] = vbat_mv / 20;                     //4
+	m_lora_app_data_buffer[buffSize++] = highByte(sleep_time / 1000);      //5
+	m_lora_app_data_buffer[buffSize++] = lowByte(sleep_time / 1000);       //6
+	m_lora_app_data_buffer[buffSize++] = burst_mode_counter;			   //7
+	m_lora_app_data_buffer[buffSize++] = (total_counts >> 24) & 0xFF;      //8
+	m_lora_app_data_buffer[buffSize++] = (total_counts >> 16) & 0xFF;      //9
+	m_lora_app_data_buffer[buffSize++] = (total_counts >> 8) & 0xFF;       //10
+	m_lora_app_data_buffer[buffSize++] = (total_counts) & 0xFF;            //11
+	m_lora_app_data_buffer[buffSize++] = vbat_per;						   //12
+	
+	//  m_lora_app_data_buffer[buffSize++] = 'l';
+	//  m_lora_app_data_buffer[buffSize++] = 'o';
+
+	lmh_app_data_t m_lora_app_data = {m_lora_app_data_buffer, 0, 0, 0, 0};
+	m_lora_app_data.buffsize = buffSize;
+	m_lora_app_data.port = 2;
+
+	lmh_error_status error = lmh_send(&m_lora_app_data, LMH_UNCONFIRMED_MSG);
+	// Reset the last message counts to 0
+	last_message_counts = 0;
+
+	MYLOG("APP", "Packet Sent");
+	return (error == 0);
 }

@@ -5,10 +5,38 @@
 // And converts it to bytes to send to the device over lora
 
 function encodeDownlink(input) {
-    return {
-        bytes: [1, 2, 3],
-        fPort: 1
+
+    if (('burst_mode' in input.data) && (input.data.burst_mode == true)){
+        return {
+            bytes: [0, 20],
+            fPort: 2
+        }
     }
+
+    if ('uplink_interval_secs' in input.data){
+        var uplink_secs = input.data.uplink_interval_secs
+
+        // we want to represent the input as a 8-bytes array
+        var secsByte1 = 0
+        var secsByte2 = 0
+        var secsByte3 = 0
+        
+        secsByte1 = uplink_secs & 0xff
+        uplink_secs = (uplink_secs - secsByte1) / 256
+
+        secsByte2 = uplink_secs & 0xff
+        uplink_secs = (uplink_secs - secsByte2) / 256
+
+        secsByte3 = uplink_secs & 0xff
+        uplink_secs = (uplink_secs - secsByte3) / 256
+
+        return {
+            // bytes: [1, secsByte3, secsByte2, secsByte1],
+            bytes: [secsByte3, secsByte2, secsByte1],
+            fPort: 2
+        }
+    }
+
 }
 
 
@@ -27,10 +55,31 @@ function decodeDownlink(input) {
     //     "bytes": [1, 2, 3],
     //     "fPort": 1
     // }
+    
+    var mode=(input.bytes[0]);
 
-    return {
-        data: {
-          bytes: input.bytes
+	switch (mode) {
+	
+        case 01:
+
+            return {
+                data : {
+                    "uplinkIntervalSecs" : null
+                }
+            }
+            break;
+            
+        case 04:
+            return {
+                data : {
+                    "burstMode" : null
+                }
+            }
+            break;
+        
+        default:
+            return {
+                errors: ["unknown downlink"]
+            }
         }
-    };
 }
