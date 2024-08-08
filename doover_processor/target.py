@@ -74,24 +74,22 @@ class target(ProcessorBase):
         #         logging.info("No message found - skipping processing")
         #         return
 
+        uplink_msg = self.uplink_channel.fetch_messages()
+
         if uplink_msg is None:
             logging.info("No uplink message found - skipping processing")
             return
 
-        logging.info("Received message: " + str(raw_message))
-        uplink_msg = self.uplink_channel.fetch_messages()
-
+        logging.info("Received message: " + str(uplink_msg))
         
+        print("uplink_msg: ", uplink_msg)
+    
+        # self.ui_manager.update_variable("lastUplink", datetime.now(timezone.utc).isoformat())
+        # self.ui_manager.update_variable("rawCurrent", rawCurrent)
+        # self.ui_manager.update_variable("rawFlowCount", rawFlowCount)
+        # self.ui_manager.update_variable("currentFlowRate", currentFlowRate )
 
 
-        self.ui_manager.update_variable("lastUplink", datetime.now(timezone.utc).isoformat())
-        self.ui_manager.update_variable("rawCurrent", rawCurrent)
-        self.ui_manager.update_variable("rawFlowCount", rawFlowCount)
-        self.ui_manager.update_variable("currentFlowRate", currentFlowRate )
-
-
-
-        # raw_message = self.message.fetch_payload()
         
 
         # msg_inner = raw_message.get("message", None)
@@ -130,13 +128,13 @@ class target(ProcessorBase):
 
         
 
-        if "batv" in msg_inner:
-            self.ui_manager.update_variable("batteryVoltage", msg_inner["batv"])
+        # if "batv" in msg_inner:
+        #     self.ui_manager.update_variable("batteryVoltage", msg_inner["batv"])
 
-        if "rsrp" in msg_inner:
-            rsrp = msg_inner["rsrp"]
-            signal_strength_percent = self.rsrp_to_percentage(rsrp)
-            self.ui_manager.update_variable("signalStrength", signal_strength_percent)
+        # if "rsrp" in msg_inner:
+        #     rsrp = msg_inner["rsrp"]
+        #     signal_strength_percent = self.rsrp_to_percentage(rsrp)
+        #     self.ui_manager.update_variable("signalStrength", signal_strength_percent)
 
 
         self.ui_manager.push(should_remove=True, even_if_empty=True)
