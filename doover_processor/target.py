@@ -190,11 +190,8 @@ class target(ProcessorBase):
         
         time_interval = (datetime.now(timezone.utc).timestamp() - last_time_stamp)
 
-        print("new_flow_count: ",new_flow_count)
-        print("prev_flow_count: ",prev_flow_count)
-        print("time_interval: ",time_interval)
         res = ((new_flow_count- prev_flow_count) * self.l_per_pulse) / (time_interval/60)
-        print("flow rate ;",res)
+        
         self.ui_manager.get_element("lastRecordedTime").coerce(datetime.now(timezone.utc))
         return res
     
@@ -215,7 +212,6 @@ class target(ProcessorBase):
         try:
             ui_state = self.ui_state_channel.fetch_aggregate()
             count = ui_state['state']['children']['detailsSubmodule']['children']['rawFlowCount']['currentValue']
-            print("count from get_prev_count: ",count)
             return count
         except Exception as e:
             logging.error("Error fetching UI state: " + str(e))
