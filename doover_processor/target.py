@@ -10,11 +10,13 @@ test = 123
 
 class target(ProcessorBase):
 
+
     ui_state_channel: Channel
+
     # ui_cmds_channel: Channel
 
-    def setup(self):
 
+    def setup(self):
         self.include_vocs = False
 
         # Get the required channels        
@@ -22,14 +24,18 @@ class target(ProcessorBase):
         self.ui_cmds_channel = self.api.create_channel("ui_cmds", self.agent_id)
         self.location_channel = self.api.create_channel("location", self.agent_id)
         self.significant_event_channel = self.api.create_channel("significantEvent", self.agent_id)
-
-        # self.uplink_channel = self.api.create_channel("farmo_uplink_recv", self.agent_id)
+        self.uplink_channel = self.api.create_channel("tts_uplink_recv", self.agent_id)
         self.downlink_channel = self.api.create_channel("tts_downlink", self.agent_id)
 
         ## Construct the UI
         self._ui_elements = construct_ui()
         self.ui_manager.set_children(self._ui_elements)
         self.ui_manager.pull()
+        
+        ## Set parameters
+        self.l_per_pulse = 10 # Litres per pulse
+        self.min_flow_rate = 1 # Litres per minute
+        self.alarm_amperage = 2 # Amps
     
 
     def process(self):
@@ -74,70 +80,155 @@ class target(ProcessorBase):
         #         logging.info("No message found - skipping processing")
         #         return
 
-        uplink_msg = self.uplink_channel.fetch_messages()
+        try:
+            uplink_msg = self.process_uplink_message()
+        except Exception as e:
+            logging.error("Error processing uplink message: " + str(e))
 
         if uplink_msg is None:
             logging.info("No uplink message found - skipping processing")
             return
+        
+        ui_state = self.ui_state_channel.fetch_aggregate()
 
         logging.info("Received message: " + str(uplink_msg))
+
+        ## caclulate current flow rate and current amperage
+        current_flow_rate = self.calcCurrentFlowRate(uplink_msg.get('rawFlowCount'))
+        current_amperage = self.calcCurrentAmperage(uplink_msg.get('rawCurrent',None))
+
+        # update elements 
+        self.ui_manager.update_variable("currentFlowRate",current_flow_rate)
+        self.ui_manager.update_variable("currentAmperage",current_amperage)
+        self.ui_manager.update_variable("rawBattery",uplink_msg.get('rawBattery',None))
+        self.ui_manager.update_variable("uplinkIntervalMins",uplink_msg.get('sleepTime'),None)
+        self.ui_manager.update_variable("rawCurrent",uplink_msg.get('rawCurrent',None))
         
-        print("uplink_msg: ", uplink_msg)
+        ## TODO: store total flow count in a variable and update it with total count
+            # to show the total flow count even if device resets 
+        self.ui_manager.update_variable("rawFlowCount",uplink_msg.get('rawFlowCount',None))
+        
+        self.ui_manager.update_variable("lastRSSI",uplink_msg.get('lastRSSI',None))
+        self.ui_manager.update_variable("lastUsedGateway",uplink_msg.get('lastUsedGateway',None))
+        self.ui_manager.update_variable("signalStrength",self.rssi_to_percentage(uplink_msg.get('lastRSSI',None)))
     
-        # self.ui_manager.update_variable("lastUplink", datetime.now(timezone.utc).isoformat())
-        # self.ui_manager.update_variable("rawCurrent", rawCurrent)
-        # self.ui_manager.update_variable("rawFlowCount", rawFlowCount)
-        # self.ui_manager.update_variable("currentFlowRate", currentFlowRate )
+        ## Push Updated UI
+        self.ui_manager.push(should_remove=True, even_if_empty=True)
 
+        ## Check and send alerts if required
+        if current_flow_rate is not None and current_flow_rate is not None:
+            if current_flow_rate < 1 and current_amperage > 2:
+                msg = "Flow rate is below 0.1 L/min"
+                self.significant_event_channel.publish(msg, save_log=True)
 
-        
+        self.ui_manager.push(should_remove=True, even_if_empty=True)   
 
-        # msg_inner = raw_message.get("message", None)
-        # if msg_inner is None:
-        #     logging.info("No message field in message - skipping processing")
-        #     return
-        
-
-
-        ## TODO - Publish the location
-        # if "gps_lat" in msg_inner and msg_inner["gps_lat"] != 0 and "gps_lng" in msg_inner and msg_inner["gps_lng"] != 0:
-        #     position = {
-        #         'lat': msg_inner["gps_lat"],
-        #         'long': msg_inner["gps_lng"],
-        #     }
-        #     self.location_channel.publish(position)
-
-        # if "status" in msg_inner:
-        #     status = msg_inner["status"]
-        #     if status > 0:
-        #         self.ui_manager.update_variable("waterRatStatus", True)
-        #         self.ui_manager.update_variable("waterRatElement", 0)
-        #     else:
-        #         self.ui_manager.update_variable("waterRatStatus", False)
-        #         self.ui_manager.update_variable("waterRatElement", 75)
-        #         self.ui_manager.add_children(
-        #             ui.WarningIndicator("waterRatProblem", "Problem Here")
-        #         )
-
+        ## Sending Alerts
         #         try:
         #             if self.alert_required():
-        #                 msg = "Water Rat has detected a problem"
+        #                 msg = "Device has detected a problem"
         #                 self.significant_event_channel.publish(msg, save_log=True)
         #         except Exception as e:
         #             logging.error("Error in alert_required: " + str(e))
 
+    
+    def process_uplink_message(self):
+        aggregate = self.uplink_channel.fetch_aggregate()
+        res = {}
+        decoded_payload = None
+        if aggregate is not None:
+            try:
+                decoded_payload= aggregate['uplink_message']['decoded_payload']
+                print("decoded_payload: ",decoded_payload)
+            except Exception as e:
+                logging.error("Error fetching uplink message: " + str(e))
+
+        if decoded_payload is None:
+            return None
+        try:
+            res['rawBattery'] = decoded_payload['batt_volts']
+        except Exception as e:
+            logging.error("Error fetching battery voltage: " + str(e))
+
+        try:
+            res['rawCurrent'] = decoded_payload['current_reading']
+        except Exception as e:
+            logging.error("Error fetching current reading: " + str(e))
         
+        try:
+            res['rawFlowCount'] = decoded_payload['total_count']
+        except Exception as e:
+            logging.error("Error fetching flow count: " + str(e))
 
-        # if "batv" in msg_inner:
-        #     self.ui_manager.update_variable("batteryVoltage", msg_inner["batv"])
+        try:
+            res['sleepTime'] = decoded_payload['sleep_time']
+        except Exception as e:
+            logging.error("Error fetching sleep time: " + str(e))
 
-        # if "rsrp" in msg_inner:
-        #     rsrp = msg_inner["rsrp"]
-        #     signal_strength_percent = self.rsrp_to_percentage(rsrp)
-        #     self.ui_manager.update_variable("signalStrength", signal_strength_percent)
+        try:
+            res['lastRSSI'] = aggregate['uplink_message']['rx_metadata'][0]['rssi']
+        except Exception as e:
+            logging.error("Error fetching RSSI: " + str(e))
 
+        try:
+            res['lastUsedGateway'] = aggregate['uplink_message']['rx_metadata'][0]['gateway_ids']['gateway_id']
+        except Exception as e:
+            logging.error("Error fetching gateway ID: " + str(e))
 
-        self.ui_manager.push(should_remove=True, even_if_empty=True)
+        return res
+    
+    def calcCurrentFlowRate(self, new_flow_count):
+        prev_flow_count = self.get_prev_count()
+        last_time_stamp = self.get_prev_timestamp()
+
+        if prev_flow_count is None:
+            prev_flow_count = new_flow_count
+        
+        if last_time_stamp is None:
+            self.ui_manager.get_element("lastRecordedTime").coerce(datetime.now(timezone.utc))
+            return None
+        
+        time_interval = (datetime.now(timezone.utc).timestamp() - last_time_stamp)
+
+        print("new_flow_count: ",new_flow_count)
+        print("prev_flow_count: ",prev_flow_count)
+        print("time_interval: ",time_interval)
+        res = ((new_flow_count- prev_flow_count) * self.l_per_pulse) / (time_interval/60)
+        print("flow rate ;",res)
+        self.ui_manager.get_element("lastRecordedTime").coerce(datetime.now(timezone.utc))
+        return res
+    
+    def calcCurrentAmperage(self, current_reading):
+        if current_reading == None:
+            logging.error("No current reading found")
+            return None
+        elif current_reading < 3.8:
+            logging.error("Current sensor error")
+            return None
+        
+        max_current = 300
+        min_current = 0
+
+        return (((current_reading - 4) / 16) * (max_current - min_current)) + min_current
+
+    def get_prev_count(self):
+        try:
+            ui_state = self.ui_state_channel.fetch_aggregate()
+            count = ui_state['state']['children']['detailsSubmodule']['children']['rawFlowCount']['currentValue']
+            print("count from get_prev_count: ",count)
+            return count
+        except Exception as e:
+            logging.error("Error fetching UI state: " + str(e))
+            return None
+        
+    def get_prev_timestamp(self):
+        try:
+            res = self.ui_manager.get_command("lastRecordedTime").current_value
+            return res
+        except Exception as e:
+            logging.error("Error fetching last recorded time: " + str(e))
+            return None
+        
 
 
     ## Helpers to assess wether alerts required
@@ -163,11 +254,11 @@ class target(ProcessorBase):
             return message["status"] > 0
         return False
 
-    def rsrp_to_percentage(self, rsrp):
+    def rssi_to_percentage(self, rssi):
         
-        min_rsrp = -100
-        max_rsrp = -75
-        signal_strength_percent = int(((rsrp - max_rsrp) / (max_rsrp - min_rsrp) + 1) * 100)
+        min_rssi = -140
+        max_rssi = -40
+        signal_strength_percent = int(((rssi - max_rssi) / (max_rssi - min_rssi) + 1) * 100)
         signal_strength_percent = max(signal_strength_percent, 0)
         signal_strength_percent = min(signal_strength_percent, 100)
 
@@ -200,12 +291,7 @@ class target(ProcessorBase):
 
             self.add_to_log(msg_obj)
 
-            tts_dl_channel = pd.channel(
-                api_client=self.cli.api_client,
-                agent_id=self.kwargs['agent_id'],
-                channel_name="tts_downlinks"
-            )
-            tts_dl_channel.publish(
+            self.downlink_channel.publish(
                 msg_str=json.dumps(msg_obj),
             )
 
