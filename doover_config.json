@@ -12,7 +12,7 @@
         "processors" : [
             {
                 "name" : "message_processor",
-                "processor_package_dir" : "processor/"
+                "processor_package_dir" : "doover_processor/"
             }
         ],
         "tasks" : [
