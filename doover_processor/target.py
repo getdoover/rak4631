@@ -40,12 +40,15 @@ class target(ProcessorBase):
 
     def process(self):
         message_type = self.package_config.get("message_type")
-
+        
+        print("Message Type: ",message_type)
+        
         if message_type == "DEPLOY":
             self.on_deploy()
         elif message_type == "DOWNLINK":
             self.on_downlink()
         elif message_type == "UPLINK":
+            print("Running Uplink")
             self.on_uplink()
 
 
@@ -79,7 +82,7 @@ class target(ProcessorBase):
         #     if self.message is None:
         #         logging.info("No message found - skipping processing")
         #         return
-
+        print("Running Uplink from inside the uplink processor")
         try:
             uplink_msg = self.process_uplink_message()
         except Exception as e:
