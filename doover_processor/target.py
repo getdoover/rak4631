@@ -1,4 +1,5 @@
-import logging, json
+import logging
+import json
 from datetime import datetime, timezone
 
 from pydoover.cloud import ProcessorBase, Channel
@@ -6,20 +7,17 @@ from pydoover import ui
 
 from ui import construct_ui
 
-test = 123
 
 class target(ProcessorBase):
-
 
     ui_state_channel: Channel
 
     # ui_cmds_channel: Channel
 
-
     def setup(self):
         self.include_vocs = False
 
-        # Get the required channels        
+        # Get the required channels
         self.ui_state_channel = self.api.create_channel("ui_state", self.agent_id)
         self.ui_cmds_channel = self.api.create_channel("ui_cmds", self.agent_id)
         self.location_channel = self.api.create_channel("location", self.agent_id)
@@ -27,33 +25,28 @@ class target(ProcessorBase):
         self.uplink_channel = self.api.create_channel("tts_uplink_recv", self.agent_id)
         self.downlink_channel = self.api.create_channel("tts_downlink", self.agent_id)
 
-        ## Construct the UI
+        # Construct the UI
         self._ui_elements = construct_ui()
         self.ui_manager.set_children(self._ui_elements)
         self.ui_manager.pull()
-        
-        ## Set parameters
-        self.l_per_pulse = 10 # Litres per pulse
-        self.min_flow_rate = 1 # Litres per minute
-        self.alarm_amperage = 2 # Amps
-    
+
+        # Set parameters
+        self.l_per_pulse = 10  # Litres per pulse
+        self.min_flow_rate = 1  # Litres per minute
+        self.alarm_amperage = 2  # Amps
 
     def process(self):
         message_type = self.package_config.get("message_type")
-        
-        print("Message Type: ",message_type)
-        
+
         if message_type == "DEPLOY":
             self.on_deploy()
         elif message_type == "DOWNLINK":
             self.on_downlink()
         elif message_type == "UPLINK":
-            print("Running Uplink")
             self.on_uplink()
 
-
     def on_deploy(self):
-        ## Run any deployment code here
+        # Run any deployment code here
 
         # Construct the UI
         self.ui_manager.push(should_remove=True)
@@ -69,20 +62,8 @@ class target(ProcessorBase):
         self.send_uplink_interval_if_required()
         self.send_burst_mode_if_required()
 
-        # ## An updates of deployment start time processed in setup
-        # ## Just need to push any changes here
-        # self.ui_manager.push(should_remove=False)
-
-
     def on_uplink(self):
         # Run any uplink processing code here
-        # if not (self.message and self.message.id):
-        #     logging.info("No trigger message passed - fetching last message")
-        #     self.message = self.uplink_channel.last_message
-        #     if self.message is None:
-        #         logging.info("No message found - skipping processing")
-        #         return
-        print("Running Uplink from inside the uplink processor")
         try:
             uplink_msg = self.process_uplink_message()
         except Exception as e:
@@ -91,58 +72,43 @@ class target(ProcessorBase):
         if uplink_msg is None:
             logging.info("No uplink message found - skipping processing")
             return
-        
-        ui_state = self.ui_state_channel.fetch_aggregate()
 
         logging.info("Received message: " + str(uplink_msg))
 
-        ## caclulate current flow rate and current amperage
-        current_flow_rate = self.calcCurrentFlowRate(uplink_msg.get('rawFlowCount'))
-        current_amperage = self.calcCurrentAmperage(uplink_msg.get('rawCurrent',None))
+        # Calculate current flow rate and current amperage
+        current_flow_rate = self.calc_current_flow_rate(uplink_msg.get('rawFlowCount'))
+        current_amperage = self.calc_current_amperage(uplink_msg.get('rawCurrent', None))
 
-        # update elements 
-        self.ui_manager.update_variable("currentFlowRate",current_flow_rate)
-        self.ui_manager.update_variable("currentAmperage",current_amperage)
-        self.ui_manager.update_variable("rawBattery",uplink_msg.get('rawBattery',None))
-        self.ui_manager.update_variable("uplinkIntervalMins",uplink_msg.get('sleepTime'),None)
-        self.ui_manager.update_variable("rawCurrent",uplink_msg.get('rawCurrent',None))
-        
-        ## TODO: store total flow count in a variable and update it with total count
-            # to show the total flow count even if device resets 
-        self.ui_manager.update_variable("rawFlowCount",uplink_msg.get('rawFlowCount',None))
-        
-        self.ui_manager.update_variable("lastRSSI",uplink_msg.get('lastRSSI',None))
-        self.ui_manager.update_variable("lastUsedGateway",uplink_msg.get('lastUsedGateway',None))
-        self.ui_manager.update_variable("signalStrength",self.rssi_to_percentage(uplink_msg.get('lastRSSI',None)))
-    
-        ## Push Updated UI
+        # Update elements
+        self.ui_manager.update_variable("currentFlowRate", current_flow_rate)
+        self.ui_manager.update_variable("currentAmperage", current_amperage)
+        self.ui_manager.update_variable("rawBattery", uplink_msg.get('rawBattery', None))
+        self.ui_manager.update_variable("uplinkIntervalMins", uplink_msg.get('sleepTime'))
+        self.ui_manager.update_variable("rawCurrent", uplink_msg.get('rawCurrent', None))
+        self.ui_manager.update_variable("rawFlowCount", uplink_msg.get('rawFlowCount', None))
+        self.ui_manager.update_variable("lastRSSI", uplink_msg.get('lastRSSI', None))
+        self.ui_manager.update_variable("lastUsedGateway", uplink_msg.get('lastUsedGateway', None))
+        self.ui_manager.update_variable("signalStrength", self.rssi_to_percentage(uplink_msg.get('lastRSSI', None)))
+
+        # Push Updated UI
         self.ui_manager.push(should_remove=True, even_if_empty=True)
 
-        ## Check and send alerts if required
-        if current_flow_rate is not None and current_flow_rate is not None:
+        # Check and send alerts if required
+        if current_flow_rate is not None and current_amperage is not None:
             if current_flow_rate < 1 and current_amperage > 2:
                 msg = "Flow rate is below 0.1 L/min"
                 self.significant_event_channel.publish(msg, save_log=True)
 
-        self.ui_manager.push(should_remove=True, even_if_empty=True)   
+        self.ui_manager.push(should_remove=True, even_if_empty=True)
 
-        ## Sending Alerts
-        #         try:
-        #             if self.alert_required():
-        #                 msg = "Device has detected a problem"
-        #                 self.significant_event_channel.publish(msg, save_log=True)
-        #         except Exception as e:
-        #             logging.error("Error in alert_required: " + str(e))
-
-    
     def process_uplink_message(self):
         aggregate = self.uplink_channel.fetch_aggregate()
         res = {}
         decoded_payload = None
         if aggregate is not None:
             try:
-                decoded_payload= aggregate['uplink_message']['decoded_payload']
-                print("decoded_payload: ",decoded_payload)
+                decoded_payload = aggregate['uplink_message']['decoded_payload']
+                print("decoded_payload: ", decoded_payload)
             except Exception as e:
                 logging.error("Error fetching uplink message: " + str(e))
 
@@ -157,7 +123,7 @@ class target(ProcessorBase):
             res['rawCurrent'] = decoded_payload['current_reading']
         except Exception as e:
             logging.error("Error fetching current reading: " + str(e))
-        
+
         try:
             res['rawFlowCount'] = decoded_payload['total_count']
         except Exception as e:
@@ -179,33 +145,33 @@ class target(ProcessorBase):
             logging.error("Error fetching gateway ID: " + str(e))
 
         return res
-    
-    def calcCurrentFlowRate(self, new_flow_count):
+
+    def calc_current_flow_rate(self, new_flow_count):
         prev_flow_count = self.get_prev_count()
         last_time_stamp = self.get_prev_timestamp()
 
         if prev_flow_count is None:
             prev_flow_count = new_flow_count
-        
+
         if last_time_stamp is None:
             self.ui_manager.get_element("lastRecordedTime").coerce(datetime.now(timezone.utc))
             return None
-        
+
         time_interval = (datetime.now(timezone.utc).timestamp() - last_time_stamp)
 
-        res = ((new_flow_count- prev_flow_count) * self.l_per_pulse) / (time_interval/60)
-        
+        res = ((new_flow_count - prev_flow_count) * self.l_per_pulse) / (time_interval / 60)
+
         self.ui_manager.get_element("lastRecordedTime").coerce(datetime.now(timezone.utc))
         return res
-    
-    def calcCurrentAmperage(self, current_reading):
-        if current_reading == None:
+
+    def calc_current_amperage(self, current_reading):
+        if current_reading is None:
             logging.error("No current reading found")
             return None
         elif current_reading < 3.8:
             logging.error("Current sensor error")
             return None
-        
+
         max_current = 300
         min_current = 0
 
@@ -219,7 +185,7 @@ class target(ProcessorBase):
         except Exception as e:
             logging.error("Error fetching UI state: " + str(e))
             return None
-        
+
     def get_prev_timestamp(self):
         try:
             res = self.ui_manager.get_command("lastRecordedTime").current_value
@@ -227,18 +193,16 @@ class target(ProcessorBase):
         except Exception as e:
             logging.error("Error fetching last recorded time: " + str(e))
             return None
-        
 
-
-    ## Helpers to assess wether alerts required
+    # Helpers to assess whether alerts required
     def alert_required(self, current_status=True):
         state_messages = self.uplink_channel.fetch_messages()
 
-        ## Search through the last few messages to find the last battery level
+        # Search through the last few messages to find the last battery level
         if len(state_messages) < 2:
             logging.info("Not enough data to get previous levels")
             return current_status
-        
+
         last_message = state_messages[1].fetch_payload()
         second_last_message = state_messages[2].fetch_payload()
 
@@ -254,7 +218,6 @@ class target(ProcessorBase):
         return False
 
     def rssi_to_percentage(self, rssi):
-        
         min_rssi = -140
         max_rssi = -40
         signal_strength_percent = int(((rssi - max_rssi) / (max_rssi - min_rssi) + 1) * 100)
@@ -262,17 +225,14 @@ class target(ProcessorBase):
         signal_strength_percent = min(signal_strength_percent, 100)
 
         return signal_strength_percent
-    
 
     def send_uplink_interval_if_required(self):
-
         trigger_payload = None
         if 'msg_obj' in self.kwargs and self.kwargs['msg_obj'] is not None:
             trigger_payload = self.kwargs['msg_obj']['payload']
-        
+
         uplink_interval_mins = None
         try:
-            # should_reboot = cmds_obj['cmds']['shouldReboot']
             uplink_interval_mins = trigger_payload['cmds']['uplinkIntervalMins']
         except Exception as e:
             self.add_to_log("Could not find 'uplinkIntervalMins' in cmds object")
@@ -281,11 +241,10 @@ class target(ProcessorBase):
         self.add_to_log(uplink_interval_mins)
 
         if uplink_interval_mins is not None:
-
-            uplink_interval_secs = round( uplink_interval_mins * 60 )
+            uplink_interval_secs = round(uplink_interval_mins * 60)
 
             msg_obj = {
-                "uplink_interval_secs" : uplink_interval_secs
+                "uplink_interval_secs": uplink_interval_secs
             }
 
             self.add_to_log(msg_obj)
@@ -295,22 +254,20 @@ class target(ProcessorBase):
             )
 
     def send_burst_mode_if_required(self):
-
         trigger_payload = None
         if 'msg_obj' in self.kwargs and self.kwargs['msg_obj'] is not None:
             trigger_payload = self.kwargs['msg_obj']['payload']
-        
+
         start_burst_mode = None
         try:
-            # start_burst_mode = cmds_obj['cmds']['shouldReboot']
             start_burst_mode = trigger_payload['cmds']['burstMode']
         except Exception as e:
             self.add_to_log("Could not find 'burstMode' in cmds object")
             return
 
-        if start_burst_mode == True:
+        if start_burst_mode is True:
             msg_obj = {
-                "burst_mode" : True
+                "burst_mode": True
             }
 
             self.downlink_channel.publish(

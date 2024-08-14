@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime, timezone
-
 from pydoover import ui
 
 
@@ -8,8 +7,6 @@ def construct_ui():
 
     ui_elems = (
         ui.AlertStream("significantEvent", "Notify me of any problems"),
-        # ui.RemoteComponent("waterRatElement", "Water Rat", component_url="WaterRatElement"),
-        # ui.NumericVariable("waterRatElement", "Water Rat", component_url="WaterRatElement"),
         ui.NumericVariable("currentFlowRate", "Flow Rate (L/min)"),
         ui.NumericVariable("currentAmperage","Pump Amperage (Amps)"),
         ui.HiddenValue("lastRecordedTime"),
