@@ -41,9 +41,9 @@ def construct_ui():
         ),
         ui.ConnectionInfo(name="connectionInfo",
             connection_type=ui.ConnectionType.periodic,
-            connection_period=(12 * 60*60),
-            next_connection=(12 * 60*60),
-            offline_after=(24 * 3600),
+            connection_period=(10*60),
+            next_connection=(10*60),
+            offline_after=(20*60),
         )
     )
     return ui_elems
