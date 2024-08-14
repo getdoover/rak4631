@@ -78,8 +78,10 @@ class target(ProcessorBase):
         # Calculate current flow rate and current amperage
         current_flow_rate = self.calc_current_flow_rate(uplink_msg.get('rawFlowCount'))
         current_amperage = self.calc_current_amperage(uplink_msg.get('rawCurrent', None))
+        total_count = self.get_running_count_total(uplink_msg.get('rawFlowCount', None))
 
         # Update elements
+        self.ui_manager.get_element("runningCountTotal").coerce(total_count)
         self.ui_manager.update_variable("currentFlowRate", current_flow_rate)
         self.ui_manager.update_variable("currentAmperage", current_amperage)
         self.ui_manager.update_variable("rawBattery", uplink_msg.get('rawBattery', None))
@@ -176,6 +178,22 @@ class target(ProcessorBase):
         min_current = 0
 
         return (((current_reading - 4) / 16) * (max_current - min_current)) + min_current
+    
+    def get_running_count_total(self, new_count):
+        total = self.ui_manager.get_element("runningCountTotal").current_value 
+        last_count = self.ui_manager.get_element("rawFlowCount").current_value
+
+        if last_count is None or new_count < last_count:
+            last_count = 0
+        
+        if total is None:
+            total = 0
+
+        if new_count is None:
+            logging.error("No count recorded")
+            return None
+        
+        total += new_count - last_count
 
     def get_prev_count(self):
         try:

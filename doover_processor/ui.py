@@ -10,6 +10,7 @@ def construct_ui():
         ui.NumericVariable("currentFlowRate", "Flow Rate (L/min)"),
         ui.NumericVariable("currentAmperage","Pump Amperage (Amps)"),
         ui.HiddenValue("lastRecordedTime"),
+        ui.HiddenValue("runningCountTotal"),
         ui.Submodule("detailsSubmodule", "Details", 
             children=[
                 ui.NumericParameter("uplinkIntervalMins", "Reporting Interval (min)"),
