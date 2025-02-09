@@ -95,11 +95,18 @@ class target(ProcessorBase):
         # Push Updated UI
         self.ui_manager.push(should_remove=True, even_if_empty=True)
 
+        lastNotificationSent = self.ui_manager.get_element("prevNotificationSent").current_value
+
         # Check and send alerts if required
         if current_flow_rate is not None and current_amperage is not None:
             if current_flow_rate < 1 and current_amperage > 2:
-                msg = "Flow rate is below 0.1 L/min"
-                self.significant_event_channel.publish(msg, save_log=True)
+                if lastNotificationSent is None or lastNotificationSent is False:
+                    self.ui_manager.coerce_command("prevNotificationSent", True)
+                    msg = f"Flow rate is below 1 L/min, and current is above {current_amperage} A, manual flow meter check required"
+                    self.significant_event_channel.publish(msg, save_log=True)
+            else:
+                self.ui_manager.coerce_command("prevNotificationSent",False)
+
 
         self.ui_manager.push(should_remove=True, even_if_empty=True)
 

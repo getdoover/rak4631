@@ -11,6 +11,7 @@ def construct_ui():
         ui.NumericVariable("currentAmperage","Pump Amperage (Amps)"),
         ui.HiddenValue("lastRecordedTime"),
         ui.HiddenValue("runningCountTotal"),
+        ui.HiddenValue("prevNotificationSent"),
         ui.Submodule("detailsSubmodule", "Details", 
             children=[
                 ui.NumericParameter("uplinkIntervalMins", "Reporting Interval (min)"),
