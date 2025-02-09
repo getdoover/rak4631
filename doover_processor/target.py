@@ -102,7 +102,7 @@ class target(ProcessorBase):
             if current_flow_rate < 1 and current_amperage > 2:
                 if lastNotificationSent is None or lastNotificationSent is False:
                     self.ui_manager.coerce_command("prevNotificationSent", True)
-                    msg = f"Flow rate is below 1 L/min, and current is above {current_amperage} A, manual flow meter check required"
+                    msg = f"Flow rate is below 1 L/min, and current is above {round(current_amperage,1)} A, manual flow meter check required"
                     self.significant_event_channel.publish(msg, save_log=True)
             else:
                 self.ui_manager.coerce_command("prevNotificationSent",False)
