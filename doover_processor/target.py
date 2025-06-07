@@ -252,9 +252,10 @@ class target(ProcessorBase):
         return signal_strength_percent
 
     def send_uplink_interval_if_required(self):
-        trigger_payload = None
-        if 'msg_obj' in self.kwargs and self.kwargs['msg_obj'] is not None:
-            trigger_payload = self.kwargs['msg_obj']['payload']
+        if self.message is not None:
+            trigger_payload = self.message.fetch_payload()
+        else:
+            trigger_payload = None
 
         uplink_interval_mins = None
         try:
