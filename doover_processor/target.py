@@ -68,6 +68,7 @@ class target(ProcessorBase):
             uplink_msg = self.process_uplink_message()
         except Exception as e:
             logging.error("Error processing uplink message: " + str(e))
+            return
 
         if uplink_msg is None:
             logging.info("No uplink message found - skipping processing")
@@ -261,10 +262,10 @@ class target(ProcessorBase):
         try:
             uplink_interval_mins = trigger_payload['cmds']['uplinkIntervalMins']
         except Exception as e:
-            self.add_to_log("Could not find 'uplinkIntervalMins' in cmds object")
+            logging.info("Could not find 'uplinkIntervalMins' in cmds object")
             return
 
-        self.add_to_log(uplink_interval_mins)
+        logging.info(f"Uplink mins: {uplink_interval_mins}")
 
         if uplink_interval_mins is not None:
             uplink_interval_secs = round(uplink_interval_mins * 60)
@@ -273,22 +274,21 @@ class target(ProcessorBase):
                 "uplink_interval_secs": uplink_interval_secs
             }
 
-            self.add_to_log(msg_obj)
+            logging.info(msg_obj)
 
-            self.downlink_channel.publish(
-                msg_str=json.dumps(msg_obj),
-            )
+            self.downlink_channel.publish(msg_obj)
 
     def send_burst_mode_if_required(self):
-        trigger_payload = None
-        if 'msg_obj' in self.kwargs and self.kwargs['msg_obj'] is not None:
-            trigger_payload = self.kwargs['msg_obj']['payload']
+        if self.message is not None:
+            trigger_payload = self.message.fetch_payload()
+        else:
+            trigger_payload = None
 
         start_burst_mode = None
         try:
             start_burst_mode = trigger_payload['cmds']['burstMode']
         except Exception as e:
-            self.add_to_log("Could not find 'burstMode' in cmds object")
+            logging.info("Could not find 'burstMode' in cmds object")
             return
 
         if start_burst_mode is True:
@@ -296,6 +296,4 @@ class target(ProcessorBase):
                 "burst_mode": True
             }
 
-            self.downlink_channel.publish(
-                msg_str=json.dumps(msg_obj),
-            )
+            self.downlink_channel.publish(msg_obj)
